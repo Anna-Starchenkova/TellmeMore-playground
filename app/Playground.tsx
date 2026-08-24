@@ -17,7 +17,7 @@ const feedRounds = [
 ] as const;
 
 const schoolItems = [
-  { id: "book", name: "book", label: "BOOK", emoji: "📘", hue: "205 93% 58%" },
+  { id: "book", name: "book", label: "BOOK", emoji: "📙", hue: "31 96% 58%" },
   { id: "blue-book", name: "blue book", label: "BLUE BOOK", emoji: "📘", hue: "213 100% 55%" },
   { id: "pen", name: "pen", label: "PEN", emoji: "🖊️", hue: "201 93% 60%" },
   { id: "pencil-a", name: "pencil", label: "PENCIL", emoji: "✏️", hue: "43 100% 61%" },
@@ -252,7 +252,7 @@ function PackGame({ sound, onHome }: { sound: boolean; onHome: () => void }) {
         <div ref={bagRef} className="bag-drop-zone" aria-label="Open backpack drop zone"><span>{ready ? "READY!" : drag?.near ? "LET GO!" : "DROP HERE"}</span>{packed.map((emoji, index) => <i key={`${emoji}-${index}`} aria-hidden="true">{emoji}</i>)}</div>
         {reaction === "good" && <div className="pack-sparkles" aria-hidden="true">✦ ✓ ✦</div>}
         <div className="pack-item-dock">
-          {items.map((item) => <button type="button" key={item.id} data-id={item.id} aria-label={`Drag ${item.name} into the backpack`} onPointerDown={(event) => pointerDown(event, item.id)} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerCancel} className={`pack-object ${drag?.id === item.id ? "is-dragging" : ""} ${attempted === item.id && reaction === "good" ? "is-packing" : ""} ${attempted === item.id && reaction === "bad" ? "is-rejected" : ""}`} style={{ "--item-hue": item.hue, "--drop-x": `${dropOffset?.id === item.id ? dropOffset.x : 0}px`, "--drop-y": `${dropOffset?.id === item.id ? dropOffset.y : 0}px`, ...(drag?.id === item.id ? { transform: `translate3d(${drag.x}px, ${drag.y - 24}px, 0) scale(1.17)`, zIndex: 40 } : {}) } as CSSProperties}><span aria-hidden="true">{item.emoji}</span><b>{item.label}</b></button>)}
+          {items.map((item) => <button type="button" key={item.id} data-id={item.id} aria-label={`Drag ${item.name} into the backpack`} onPointerDown={(event) => pointerDown(event, item.id)} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerCancel} className={`pack-object ${drag?.id === item.id ? "is-dragging" : ""} ${attempted === item.id && reaction === "good" ? "is-packing" : ""} ${attempted === item.id && reaction === "bad" ? "is-rejected" : ""}`} style={{ "--item-hue": item.hue, "--drop-x": `${dropOffset?.id === item.id ? dropOffset.x : 0}px`, "--drop-y": `${dropOffset?.id === item.id ? dropOffset.y : 0}px`, ...(drag?.id === item.id ? { transform: `translate3d(${drag.x}px, ${drag.y - 24}px, 0) scale(1.17)`, zIndex: 40 } : {}) } as CSSProperties}><span aria-hidden="true">{item.id === "glue" ? <i className="glue-stick-model"><em>GLUE</em></i> : item.emoji}</span><b>{item.label}</b></button>)}
         </div>
         {round === 0 && !hintDismissed && <div className="pack-drag-hint" aria-hidden="true"><span>☝️</span><i/></div>}
         <p className={`pack-feedback ${reaction ?? ""}`}>{ready ? "READY!" : reaction === "good" ? "PACKED!" : reaction === "bad" ? "BOOP!" : "DRAG THE ITEMS INTO THE BAG"}</p>
