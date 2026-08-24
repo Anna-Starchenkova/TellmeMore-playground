@@ -56,16 +56,19 @@ function shufflePackOptions(data: typeof packRounds[number]) {
   return order;
 }
 
-const survivalRounds = [
-  { q: "She ___ to school every day.", choices: ["goes", "go"], correct: "goes" },
-  { q: "Choose the safe sentence.", choices: ["I can swim", "I can to swim"], correct: "I can swim" },
-  { q: "Yesterday we ___ a film.", choices: ["watched", "watch"], correct: "watched" },
-  { q: "There ___ two doors.", choices: ["are", "is"], correct: "are" },
-  { q: "This tunnel is ___ than that one.", choices: ["darker", "more dark"], correct: "darker" },
-  { q: "If it rains, we ___ inside.", choices: ["will stay", "stayed"], correct: "will stay" },
-  { q: "The key ___ under the rock.", choices: ["was hidden", "hid"], correct: "was hidden" },
-  { q: "Quick! Which word means ‘выход’?​", choices: ["exit", "entrance"], correct: "exit" },
-];
+const timePortalLessons = {
+  0: { base: "WATCH", past: "WATCHED", title: "TIME PORTAL", clue: "Yesterday → watched", irregular: false },
+  1: { base: "PLAY", past: "PLAYED", title: "POWER THE STREET", clue: "Yesterday → played", irregular: false },
+  4: { base: "GO", past: "WENT", title: "TIME GLITCH", clue: "GO changes to WENT", irregular: true },
+  5: { base: "SEE", past: "SAW", title: "IRREGULAR RIFT", clue: "SEE changes to SAW", irregular: true },
+} as const;
+
+const bridgeWords = ["Yesterday", "we", "watched", "a film."] as const;
+const bridgeBank = ["a film.", "watched", "Yesterday", "we"] as const;
+const escapeRelays = {
+  6: [{ base: "PLAY", past: "PLAYED" }, { base: "GO", past: "WENT" }],
+  7: [{ base: "SEE", past: "SAW" }, { base: "WATCH", past: "WATCHED" }],
+} as const;
 
 const cringePhrases = [
   { text: "I am agree with you.", correct: false, fix: "I agree with you." },
@@ -220,14 +223,83 @@ function PackGame({ sound, onHome }: { sound: boolean; onHome: () => void }) {
 }
 
 function SurvivalGame({ onHome }: { onHome: () => void }) {
-  const [round, setRound] = useState(0); const [lives, setLives] = useState(3); const [score, setScore] = useState(0); const [reaction, setReaction] = useState<ResultMood>(null); const [chosen, setChosen] = useState(""); const [done, setDone] = useState(false);
-  const data = survivalRounds[round]; const answer = (choice: string) => { if (reaction) return; const ok = choice === data.correct; setChosen(choice); setReaction(ok ? "good" : "bad"); if (ok) setScore((s) => s + 1); const newLives = ok ? lives : lives - 1; if (!ok) setLives(newLives); setTimeout(() => { if (round === survivalRounds.length - 1 || newLives === 0) setDone(true); else { setRound((r) => r + 1); setReaction(null); setChosen(""); } }, 850); };
-  if (done) return <FinalScreen icon={lives ? "🏃" : "🧟"} title={lives ? "YOU ESCAPED!" : "SO CLOSE!"} score={score} total={survivalRounds.length} detail={lives ? `${"❤️".repeat(lives)} LIVES LEFT` : "THE MONSTER GOT YOU"} tone="purple" onAgain={() => { setRound(0); setLives(3); setScore(0); setReaction(null); setDone(false); }} onHome={onHome} />;
-  return <GameFrame title="ENGLISH SURVIVAL" round={round} total={survivalRounds.length} onBack={onHome} tone="purple">
-    <section className="survival-stage"><div className="lives" aria-label={`${lives} lives`}>{[0,1,2].map((n) => <span key={n} className={n < lives ? "alive" : "lost"}>♥</span>)}</div>
-      <div className={`run-scene danger-${3 - lives} ${reaction === "good" ? "dash" : reaction === "bad" ? "caught" : ""}`}><div className="moon"/><div className="monster-chaser">🧟</div><div className="runner">🏃</div><div className="road-lines"><i/><i/><i/></div></div>
-      <div className="fork-card"><span>CHOOSE YOUR PATH</span><h1>{data.q}</h1><div className="path-choices">{data.choices.map((choice, i) => <button type="button" key={choice} onClick={() => answer(choice)} className={`${chosen === choice ? (choice === data.correct ? "right-path" : "wrong-path") : ""}`}><small>PATH {i + 1}</small><b>{choice}</b><em>➜</em></button>)}</div></div>
-      <p className={`instant-feedback ${reaction ?? ""}`}>{reaction === "good" ? "SAFE PATH — RUN!" : reaction === "bad" ? "WRONG TURN — IT'S CLOSER!" : "No time limit. Choose wisely."}</p>
+  const [scene, setScene] = useState(0); const [lives, setLives] = useState(3); const [reaction, setReaction] = useState<ResultMood>(null); const [done, setDone] = useState(false); const [escaped, setEscaped] = useState(true); const [transformed, setTransformed] = useState(""); const [bridgePlaced, setBridgePlaced] = useState<(string | null)[]>([null, null, null, null]); const [rejected, setRejected] = useState(""); const [createdPast, setCreatedPast] = useState(""); const [relayStep, setRelayStep] = useState(0);
+  const [drag, setDrag] = useState<{ id: string; x: number; y: number; sx: number; sy: number; moved: boolean; near: string } | null>(null);
+  const portalRef = useRef<HTMLDivElement>(null); const doorRef = useRef<HTMLDivElement>(null); const bridgeRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const portalLesson = scene === 0 ? timePortalLessons[0] : scene === 1 ? timePortalLessons[1] : scene === 4 ? timePortalLessons[4] : scene === 5 ? timePortalLessons[5] : null;
+  const relay = scene === 6 ? escapeRelays[6] : scene === 7 ? escapeRelays[7] : null; const relayVerb = relay?.[relayStep];
+  const advance = () => { setScene((value) => value + 1); setReaction(null); setTransformed(""); setRejected(""); setCreatedPast(""); setRelayStep(0); };
+  const damage = () => { setLives((value) => { const next = Math.max(0, value - 1); if (next === 0) setTimeout(() => { setEscaped(false); setDone(true); }, 700); return next; }); };
+  const findZone = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const inside = (element: HTMLDivElement | null, padding = 0) => { const rect = element?.getBoundingClientRect(); return !!rect && event.clientX >= rect.left - padding && event.clientX <= rect.right + padding && event.clientY >= rect.top - padding && event.clientY <= rect.bottom + padding; };
+    if (inside(portalRef.current, 20)) return "portal"; if (inside(doorRef.current, 15)) return "door";
+    const bridgeIndex = bridgeRefs.current.findIndex((element) => inside(element, 8)); return bridgeIndex >= 0 ? `bridge-${bridgeIndex}` : "";
+  };
+  const beginDrag = (event: ReactPointerEvent<HTMLButtonElement>, id: string) => { if (reaction) return; event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); setDrag({ id, x: 0, y: 0, sx: event.clientX, sy: event.clientY, moved: false, near: "" }); };
+  const moveDrag = (event: ReactPointerEvent<HTMLButtonElement>) => { if (!drag || drag.id !== event.currentTarget.dataset.id) return; event.preventDefault(); const x = event.clientX - drag.sx; const y = event.clientY - drag.sy; setDrag((value) => value ? { ...value, x, y, moved: value.moved || Math.abs(x) + Math.abs(y) > 9, near: findZone(event) } : null); };
+  const completePortal = (base: string, past: string, irregular: boolean) => { setReaction("good"); setTransformed(past); setTimeout(() => { setTransformed(""); setReaction(null); if (scene === 0 || scene === 1 || scene === 4 || scene === 5) advance(); }, irregular ? 1150 : 950); };
+  const handleBridgeDrop = (id: string, zone: string) => {
+    if (!zone.startsWith("bridge-")) return; const slot = Number(zone.split("-")[1]);
+    if (bridgeWords[slot] !== id) { setRejected(id); setReaction("bad"); setTimeout(() => { setRejected(""); setReaction(null); }, 650); return; }
+    const next = [...bridgePlaced]; next[slot] = id; setBridgePlaced(next); setReaction("good");
+    if (next.every(Boolean)) setTimeout(() => { setBridgePlaced([null, null, null, null]); advance(); }, 1000); else setTimeout(() => setReaction(null), 430);
+  };
+  const handleCreateDrop = (id: string, zone: string) => {
+    if (createdPast) { if (id === "WATCHED" && zone === "door") { setReaction("good"); setTimeout(advance, 1050); } return; }
+    if (zone === "door" && id === "WATCH") { setRejected("WATCH"); setReaction("bad"); damage(); setTimeout(() => { setRejected(""); setReaction(null); }, 950); return; }
+    if (zone !== "portal") return;
+    if (id !== "WATCH") { setRejected(id); setReaction("bad"); setTimeout(() => { setRejected(""); setReaction(null); }, 720); return; }
+    setCreatedPast("WATCHED"); setTransformed("WATCHED"); setReaction("good"); setTimeout(() => { setReaction(null); setTransformed(""); }, 650);
+  };
+  const handleRelayDrop = (id: string, zone: string) => {
+    if (!relay || !relayVerb || zone !== "portal" || id !== relayVerb.base) return; setReaction("good"); setTransformed(relayVerb.past);
+    setTimeout(() => { setTransformed(""); if (relayStep < relay.length - 1) { setRelayStep((value) => value + 1); setReaction(null); } else if (scene === 7) { setEscaped(true); setDone(true); } else advance(); }, 900);
+  };
+  const dropToken = (id: string, zone: string) => {
+    if (scene === 2) { handleBridgeDrop(id, zone); return; } if (scene === 3) { handleCreateDrop(id, zone); return; } if (scene === 6 || scene === 7) { handleRelayDrop(id, zone); return; }
+    if (portalLesson && zone === "portal" && id === portalLesson.base) completePortal(portalLesson.base, portalLesson.past, portalLesson.irregular);
+  };
+  const endDrag = (event: ReactPointerEvent<HTMLButtonElement>) => { if (!drag) return; const id = drag.id; const moved = drag.moved; const zone = findZone(event); setDrag(null); if (moved) dropToken(id, zone); };
+  const cancelDrag = () => setDrag(null);
+  const token = (id: string, extra = "") => <button type="button" key={id} data-id={id} className={`time-word ${extra} ${drag?.id === id ? "is-dragging" : ""} ${rejected === id ? "is-rejected" : ""}`} aria-label={`Drag ${id}`} onPointerDown={(event) => beginDrag(event, id)} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={cancelDrag} style={drag?.id === id ? { transform: `translate3d(${drag.x}px, ${drag.y - 20}px, 0) scale(1.13)`, zIndex: 40 } : undefined}>{id}</button>;
+  const reset = () => { setScene(0); setLives(3); setReaction(null); setDone(false); setEscaped(true); setTransformed(""); setBridgePlaced([null, null, null, null]); setRejected(""); setCreatedPast(""); setRelayStep(0); setDrag(null); };
+  if (done) return <FinalScreen icon={escaped ? "✦" : "⌛"} title={escaped ? "TIME REPAIRED" : "RIFT RESET"} score={escaped ? 8 : scene} total={8} detail={escaped ? "YOU ESCAPED!" : "TRY THE TIMELINE AGAIN"} tone="purple" onAgain={reset} onHome={onHome} />;
+  return <GameFrame title="ENGLISH SURVIVAL" round={scene} total={8} onBack={onHome} tone="purple">
+    <section className={`time-stage danger-${3 - lives} ${reaction === "bad" ? "time-error" : ""} ${reaction === "good" ? "time-success" : ""}`}>
+      <div className="time-world">
+        <div className="time-rain" aria-hidden="true"/>
+        <div className="survival-hud"><strong>TIME BROKE</strong><div className="survival-lives" aria-label={`${lives} lives`}>{[0,1,2].map((heart) => <span key={heart} className={heart < lives ? "alive" : "lost"}>♥</span>)}</div></div>
+        {portalLesson && <div className={`portal-mission ${portalLesson.irregular ? "irregular-scene" : ""}`}>
+          <div className="world-caption"><small>{portalLesson.title}</small><b>{portalLesson.irregular ? "The portal changes this verb in a special way" : "Drag the verb from TODAY to YESTERDAY"}</b></div>
+          <div className="time-side today-side"><span>TODAY</span>{token(portalLesson.base)}</div>
+          <div ref={portalRef} className={`time-portal ${drag?.near === "portal" ? "is-near" : ""} ${reaction === "good" ? "is-transforming" : ""}`}><i/><em>{portalLesson.irregular ? "IRREGULAR" : "TIME PORTAL"}</em></div>
+          <div className="time-side yesterday-side"><span>YESTERDAY</span>{transformed ? <strong className="past-result">{transformed}</strong> : <strong className="past-ghost">PAST</strong>}</div>
+          <p className="world-clue">{transformed ? portalLesson.clue : "MOVE THE WORD THROUGH TIME"}</p>
+        </div>}
+        {scene === 2 && <div className="bridge-mission">
+          <div className="world-caption"><small>REPAIR THE BRIDGE</small><b>Build the sentence to cross the gap</b></div>
+          <div className="bridge-slots">{bridgeWords.map((word, index) => <div key={word} ref={(element) => { bridgeRefs.current[index] = element; }} className={`bridge-slot ${drag?.near === `bridge-${index}` ? "is-near" : ""} ${bridgePlaced[index] ? "is-powered" : ""}`}><span>{bridgePlaced[index] ?? index + 1}</span></div>)}</div>
+          <div className="bridge-bank">{bridgeBank.filter((word) => !bridgePlaced.includes(word)).map((word) => token(word, "bridge-word"))}</div>
+          <p className="world-clue">DRAG EACH FRAGMENT INTO THE TIMELINE</p>
+        </div>}
+        {scene === 3 && <div className={`create-mission ${rejected === "WATCH" ? "yesterday-alert" : ""}`}>
+          <div className="world-caption"><small>CREATE THE VERB</small><b>Read the memory. Change the verb. Unlock the door.</b></div>
+          <div className="memory-screen"><i/><i/><i/><span>FILM MEMORY</span></div>
+          <div className="create-route">
+            <div className="create-verbs">{createdPast ? token("WATCHED", "created-word") : ["PLAY", "WATCH", "VISIT"].map((word) => token(word))}</div>
+            <div ref={portalRef} className={`time-portal mini-portal ${drag?.near === "portal" ? "is-near" : ""} ${reaction === "good" && createdPast ? "is-transforming" : ""}`}><i/><em>PAST</em></div>
+            <div ref={doorRef} className={`time-door ${drag?.near === "door" ? "is-near" : ""} ${reaction === "good" && createdPast ? "door-ready" : ""}`}><span className="yesterday-word">Yesterday</span><b>we <i>{createdPast ? "___" : "___"}</i> a film.</b><em>ENERGY SLOT</em></div>
+          </div>
+          <p className="world-clue">{createdPast ? "PUT WATCHED INTO THE DOOR" : rejected === "WATCH" ? "YESTERDAY NEEDS THE PORTAL" : "TAKE THE VERB THROUGH TIME"}</p>
+        </div>}
+        {relay && relayVerb && <div className="relay-mission">
+          <div className="world-caption"><small>{scene === 6 ? "ESCAPE RELAY I" : "FINAL ESCAPE"}</small><b>Repair every time fragment</b></div>
+          <div className="escape-cells">{relay.map((verb, index) => <span key={verb.base} className={index < relayStep || (index === relayStep && transformed) ? "powered" : ""}>{index + 1}</span>)}</div>
+          <div className="relay-track">{token(relayVerb.base, "relay-word")}<div ref={portalRef} className={`time-portal relay-portal ${drag?.near === "portal" ? "is-near" : ""} ${reaction === "good" ? "is-transforming" : ""}`}><i/><em>SHIFT</em></div><div className="relay-output">{transformed || "?"}</div></div>
+          <div className={`escape-gate ${scene === 7 && relayStep === 1 ? "almost-open" : ""}`}><i/><i/><b>ESCAPE GATE</b></div>
+          <p className="world-clue">DRAG THE VERB THROUGH THE RIFT</p>
+        </div>}
+      </div>
     </section>
   </GameFrame>;
 }
