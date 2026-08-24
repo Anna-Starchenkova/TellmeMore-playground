@@ -274,13 +274,13 @@ function SurvivalGame({ onHome }: { onHome: () => void }) {
           <div className="time-side today-side"><span>TODAY</span>{token(portalLesson.base)}</div>
           <div ref={portalRef} className={`time-portal ${drag?.near === "portal" ? "is-near" : ""} ${reaction === "good" ? "is-transforming" : ""}`}><i/><em>{portalLesson.irregular ? "IRREGULAR" : "TIME PORTAL"}</em></div>
           <div className="time-side yesterday-side"><span>YESTERDAY</span>{transformed ? <strong className="past-result">{transformed}</strong> : <strong className="past-ghost">PAST</strong>}</div>
-          <p className="world-clue">{transformed ? portalLesson.clue : "MOVE THE WORD THROUGH TIME"}</p>
+          <p className="world-clue world-instruction"><b>{transformed ? "TIME FIXED" : "ACTION"}</b><span>{transformed ? portalLesson.clue : `Drag ${portalLesson.base} through the portal`}</span></p>
         </div>}
         {scene === 2 && <div className="bridge-mission">
           <div className="world-caption"><small>REPAIR THE BRIDGE</small><b>Build the sentence to cross the gap</b></div>
           <div className="bridge-slots">{bridgeWords.map((word, index) => <div key={word} ref={(element) => { bridgeRefs.current[index] = element; }} className={`bridge-slot ${drag?.near === `bridge-${index}` ? "is-near" : ""} ${bridgePlaced[index] ? "is-powered" : ""}`}><span>{bridgePlaced[index] ?? index + 1}</span></div>)}</div>
           <div className="bridge-bank">{bridgeBank.filter((word) => !bridgePlaced.includes(word)).map((word) => token(word, "bridge-word"))}</div>
-          <p className="world-clue">DRAG EACH FRAGMENT INTO THE TIMELINE</p>
+          <p className="world-clue world-instruction"><b>ACTION</b><span>Drag the words into the slots in the correct order</span></p>
         </div>}
         {scene === 3 && <div className={`create-mission ${rejected === "WATCH" ? "yesterday-alert" : ""}`}>
           <div className="world-caption"><small>CREATE THE VERB</small><b>Read the memory. Change the verb. Unlock the door.</b></div>
@@ -290,14 +290,14 @@ function SurvivalGame({ onHome }: { onHome: () => void }) {
             <div ref={portalRef} className={`time-portal mini-portal ${drag?.near === "portal" ? "is-near" : ""} ${reaction === "good" && createdPast ? "is-transforming" : ""}`}><i/><em>PAST</em></div>
             <div ref={doorRef} className={`time-door ${drag?.near === "door" ? "is-near" : ""} ${reaction === "good" && createdPast ? "door-ready" : ""}`}><span className="yesterday-word">Yesterday</span><b>we <i>{createdPast ? "___" : "___"}</i> a film.</b><em>ENERGY SLOT</em></div>
           </div>
-          <p className="world-clue">{createdPast ? "PUT WATCHED INTO THE DOOR" : rejected === "WATCH" ? "YESTERDAY NEEDS THE PORTAL" : "TAKE THE VERB THROUGH TIME"}</p>
+          <p className="world-clue world-instruction"><b>{rejected === "WATCH" ? "TIME HINT" : "ACTION"}</b><span>{createdPast ? "Drag WATCHED into the door slot" : rejected === "WATCH" ? "Drag WATCH through the portal first" : "Drag WATCH through the portal"}</span></p>
         </div>}
         {relay && relayVerb && <div className="relay-mission">
           <div className="world-caption"><small>{scene === 6 ? "ESCAPE RELAY I" : "FINAL ESCAPE"}</small><b>Repair every time fragment</b></div>
           <div className="escape-cells">{relay.map((verb, index) => <span key={verb.base} className={index < relayStep || (index === relayStep && transformed) ? "powered" : ""}>{index + 1}</span>)}</div>
           <div className="relay-track">{token(relayVerb.base, "relay-word")}<div ref={portalRef} className={`time-portal relay-portal ${drag?.near === "portal" ? "is-near" : ""} ${reaction === "good" ? "is-transforming" : ""}`}><i/><em>SHIFT</em></div><div className="relay-output">{transformed || "?"}</div></div>
           <div className={`escape-gate ${scene === 7 && relayStep === 1 ? "almost-open" : ""}`}><i/><i/><b>ESCAPE GATE</b></div>
-          <p className="world-clue">DRAG THE VERB THROUGH THE RIFT</p>
+          <p className="world-clue world-instruction"><b>ACTION</b><span>Drag {relayVerb.base} through the portal</span></p>
         </div>}
       </div>
     </section>
