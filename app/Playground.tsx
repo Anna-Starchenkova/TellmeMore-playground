@@ -109,6 +109,36 @@ function speak(text: string, enabled: boolean) {
   window.speechSynthesis.speak(utterance);
 }
 
+type MonsterVoiceMood = "request" | "happy" | "funny";
+
+function findNaturalEnglishVoice(voices: SpeechSynthesisVoice[]) {
+  const englishVoices = voices.filter((voice) => /^en[-_]/i.test(voice.lang));
+  return englishVoices.sort((left, right) => {
+    const quality = (voice: SpeechSynthesisVoice) => {
+      const name = voice.name.toLowerCase(); let score = 0;
+      if (/natural|online/.test(name)) score += 100;
+      if (/google (us|uk) english/.test(name)) score += 85;
+      if (/aria|jenny|sonia|samantha|ava|serena/.test(name)) score += 70;
+      if (/microsoft|google|apple/.test(name)) score += 25;
+      if (/en-us/i.test(voice.lang)) score += 12;
+      if (voice.localService) score += 4;
+      return score;
+    };
+    return quality(right) - quality(left);
+  })[0];
+}
+
+function speakMonster(text: string, enabled: boolean, mood: MonsterVoiceMood = "request") {
+  if (!enabled || typeof window === "undefined" || !("speechSynthesis" in window)) return;
+  const synthesizer = window.speechSynthesis; synthesizer.cancel();
+  const utterance = new SpeechSynthesisUtterance(text); const voice = findNaturalEnglishVoice(synthesizer.getVoices());
+  if (voice) { utterance.voice = voice; utterance.lang = voice.lang; } else utterance.lang = "en-US";
+  utterance.rate = mood === "request" ? 0.84 : mood === "happy" ? 0.92 : 0.86;
+  utterance.pitch = mood === "request" ? 1.02 : mood === "happy" ? 1.09 : 0.92;
+  utterance.volume = 1;
+  synthesizer.speak(utterance);
+}
+
 function GameFrame({ title, round, total, onBack, children, tone = "lime" }: { title: string; round: number; total: number; onBack: () => void; children: React.ReactNode; tone?: string }) {
   return <main className={`game-shell game-${tone}`}>
     <header className="game-topbar">
@@ -137,14 +167,14 @@ function FeedGame({ sound, onHome }: { sound: boolean; onHome: () => void }) {
   const [drag, setDrag] = useState<{ name: string; x: number; y: number; sx: number; sy: number; near: boolean } | null>(null); const [look, setLook] = useState({ x: 0, y: 0 });
   const mouthRef = useRef<HTMLDivElement>(null);
   const data = feedRounds[round];
-  useEffect(() => { if (!done) { const timer = setTimeout(() => speak(data.prompt, sound), 350); return () => clearTimeout(timer); } }, [round, done, data.prompt, sound]);
+  useEffect(() => { if (!done) { const timer = setTimeout(() => speakMonster(data.prompt, sound), 350); return () => clearTimeout(timer); } }, [round, done, data.prompt, sound]);
   const finishDrop = (name: string) => {
     if (reaction) return; const correct = name === data.want; setPicked(name); setReaction(correct ? "good" : "bad");
     if (correct) {
-      setScore((value) => value + 1); speak("Yum! Thank you!", sound);
+      setScore((value) => value + 1); speakMonster("Yum! Thank you!", sound, "happy");
       setTimeout(() => { if (round === feedRounds.length - 1) setDone(true); else setRound((value) => value + 1); setReaction(null); setPicked(""); }, 1050);
     } else {
-      speak("Bleh!", sound); setTimeout(() => { setReaction(null); setPicked(""); }, 950);
+      speakMonster("Bleh!", sound, "funny"); setTimeout(() => { setReaction(null); setPicked(""); }, 950);
     }
   };
   const pointerDown = (event: ReactPointerEvent<HTMLButtonElement>, name: string) => {
@@ -168,7 +198,7 @@ function FeedGame({ sound, onHome }: { sound: boolean; onHome: () => void }) {
   return <GameFrame title="FEED THE MONSTER" round={round} total={feedRounds.length} onBack={onHome}>
     <section className="feed-stage feed-3d-stage">
       <div className={`monster-lab ${drag ? "is-tracking" : ""} ${drag?.near ? "is-near" : ""} ${reaction === "good" ? "is-chewing" : reaction === "bad" ? "is-disgusted" : ""}`} style={labStyle}>
-        <button type="button" className="speech-bubble" onClick={() => speak(data.prompt, sound)} aria-label="Repeat request"><span>🔊</span>{data.prompt}</button>
+        <button type="button" className="speech-bubble" onClick={() => speakMonster(data.prompt, sound)} aria-label="Repeat request"><span>🔊</span>{data.prompt}</button>
         <i className="tracking-glint glint-left"/><i className="tracking-glint glint-right"/>
         <div ref={mouthRef} className="mouth-drop" aria-label="Monster mouth drop zone"/>
         {reaction === "good" && <div className="yum-burst" aria-hidden="true">♥ ✦ ♥</div>}
