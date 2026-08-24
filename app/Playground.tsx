@@ -57,10 +57,10 @@ function shufflePackOptions(data: typeof packRounds[number]) {
 }
 
 const timePortalLessons = {
-  0: { base: "WATCH", past: "WATCHED", title: "TIME PORTAL", clue: "Yesterday → watched", irregular: false },
-  1: { base: "PLAY", past: "PLAYED", title: "POWER THE STREET", clue: "Yesterday → played", irregular: false },
-  4: { base: "GO", past: "WENT", title: "TIME GLITCH", clue: "GO changes to WENT", irregular: true },
-  5: { base: "SEE", past: "SAW", title: "IRREGULAR RIFT", clue: "SEE changes to SAW", irregular: true },
+  0: { base: "WATCH", past: "WATCHED", title: "TIME PORTAL", sentenceBefore: "Yesterday we", sentenceAfter: "a film.", irregular: false },
+  1: { base: "PLAY", past: "PLAYED", title: "POWER THE STREET", sentenceBefore: "Yesterday they", sentenceAfter: "football.", irregular: false },
+  4: { base: "GO", past: "WENT", title: "TIME GLITCH", sentenceBefore: "Yesterday I", sentenceAfter: "home.", irregular: true },
+  5: { base: "SEE", past: "SAW", title: "IRREGULAR RIFT", sentenceBefore: "Yesterday she", sentenceAfter: "a friend.", irregular: true },
 } as const;
 
 const bridgeWords = ["Yesterday", "we", "watched", "a film."] as const;
@@ -237,7 +237,7 @@ function SurvivalGame({ onHome }: { onHome: () => void }) {
   };
   const beginDrag = (event: ReactPointerEvent<HTMLButtonElement>, id: string) => { if (reaction) return; event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); setDrag({ id, x: 0, y: 0, sx: event.clientX, sy: event.clientY, moved: false, near: "" }); };
   const moveDrag = (event: ReactPointerEvent<HTMLButtonElement>) => { if (!drag || drag.id !== event.currentTarget.dataset.id) return; event.preventDefault(); const x = event.clientX - drag.sx; const y = event.clientY - drag.sy; setDrag((value) => value ? { ...value, x, y, moved: value.moved || Math.abs(x) + Math.abs(y) > 9, near: findZone(event) } : null); };
-  const completePortal = (base: string, past: string, irregular: boolean) => { setReaction("good"); setTransformed(past); setTimeout(() => { setTransformed(""); setReaction(null); if (scene === 0 || scene === 1 || scene === 4 || scene === 5) advance(); }, irregular ? 1150 : 950); };
+  const completePortal = (past: string, irregular: boolean) => { setReaction("good"); setTransformed(past); setTimeout(() => setReaction(null), irregular ? 900 : 650); };
   const handleBridgeDrop = (id: string, zone: string) => {
     if (!zone.startsWith("bridge-")) return; const slot = Number(zone.split("-")[1]);
     if (bridgeWords[slot] !== id) { setRejected(id); setReaction("bad"); setTimeout(() => { setRejected(""); setReaction(null); }, 650); return; }
@@ -257,7 +257,9 @@ function SurvivalGame({ onHome }: { onHome: () => void }) {
   };
   const dropToken = (id: string, zone: string) => {
     if (scene === 2) { handleBridgeDrop(id, zone); return; } if (scene === 3) { handleCreateDrop(id, zone); return; } if (scene === 6 || scene === 7) { handleRelayDrop(id, zone); return; }
-    if (portalLesson && zone === "portal" && id === portalLesson.base) completePortal(portalLesson.base, portalLesson.past, portalLesson.irregular);
+    if (!portalLesson) return;
+    if (!transformed && zone === "portal" && id === portalLesson.base) { completePortal(portalLesson.past, portalLesson.irregular); return; }
+    if (transformed && zone === "door" && id === portalLesson.past) { setReaction("good"); setTimeout(advance, 900); }
   };
   const endDrag = (event: ReactPointerEvent<HTMLButtonElement>) => { if (!drag) return; const id = drag.id; const moved = drag.moved; const zone = findZone(event); setDrag(null); if (moved) dropToken(id, zone); };
   const cancelDrag = () => setDrag(null);
@@ -270,11 +272,17 @@ function SurvivalGame({ onHome }: { onHome: () => void }) {
         <div className="time-rain" aria-hidden="true"/>
         <div className="survival-hud"><strong>TIME BROKE</strong><div className="survival-lives" aria-label={`${lives} lives`}>{[0,1,2].map((heart) => <span key={heart} className={heart < lives ? "alive" : "lost"}>♥</span>)}</div></div>
         {portalLesson && <div className={`portal-mission ${portalLesson.irregular ? "irregular-scene" : ""}`}>
-          <div className="world-caption"><small>{portalLesson.title}</small><b>{portalLesson.irregular ? "The portal changes this verb in a special way" : "Drag the verb from TODAY to YESTERDAY"}</b></div>
-          <div className="time-side today-side"><span>TODAY</span>{token(portalLesson.base)}</div>
+          <div className="world-caption"><small>{portalLesson.title}</small><b>{transformed ? "Use the form you checked to repair the sentence" : "Say the past form aloud. Then check yourself."}</b></div>
+          <div className="portal-steps" aria-label="Say it, check it, use it">
+            <span className={transformed ? "is-done" : "is-active"}>1 · SAY IT</span>
+            <span className={transformed ? "is-done" : ""}>2 · CHECK</span>
+            <span className={transformed ? "is-active" : ""}>3 · USE IT</span>
+          </div>
+          <div className="time-side today-side"><span>TODAY</span>{transformed ? <strong className="time-word time-word-static">{portalLesson.base}</strong> : token(portalLesson.base)}</div>
           <div ref={portalRef} className={`time-portal ${drag?.near === "portal" ? "is-near" : ""} ${reaction === "good" ? "is-transforming" : ""}`}><i/><em>{portalLesson.irregular ? "IRREGULAR" : "TIME PORTAL"}</em></div>
-          <div className="time-side yesterday-side"><span>YESTERDAY</span>{transformed ? <strong className="past-result">{transformed}</strong> : <strong className="past-ghost">PAST</strong>}</div>
-          <p className="world-clue world-instruction"><b>{transformed ? "TIME FIXED" : "ACTION"}</b><span>{transformed ? "The timeline is repaired" : "Drag the verb through the portal"}</span></p>
+          <div className="time-side yesterday-side"><span>YESTERDAY</span>{transformed ? token(transformed, "portal-answer") : <strong className="past-ghost">PAST</strong>}</div>
+          <div ref={doorRef} className={`portal-sentence ${drag?.near === "door" ? "is-near" : ""} ${reaction === "good" && transformed ? "is-powered" : ""}`} aria-label="Sentence drop zone"><span>{portalLesson.sentenceBefore}</span><i>___</i><span>{portalLesson.sentenceAfter}</span></div>
+          <p className="world-clue world-instruction"><b>{transformed ? "USE IT" : "ACTION"}</b><span>{transformed ? "Drag the checked verb into the sentence" : "Say the past form aloud, then drag the verb through the portal"}</span></p>
         </div>}
         {scene === 2 && <div className="bridge-mission">
           <div className="world-caption"><small>REPAIR THE BRIDGE</small><b>Build the sentence to cross the gap</b></div>
