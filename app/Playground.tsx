@@ -188,9 +188,31 @@ export default function Playground() {
   if (game === "survival") return <SurvivalGame onHome={() => setGame(null)} />;
   if (game === "cringe") return <CringeGame onHome={() => setGame(null)} />;
   return <main className="home-shell">
-    <nav className="topbar" aria-label="Main navigation"><a className="brand" href="#" aria-label="TELLmeMORE home">TELL<span>me</span>MORE</a><div className="nav-actions"><button className="battle" type="button" onClick={() => setMenuOpen(true)}>🏆 <span>CLASS BATTLE</span></button><button className="round-button" type="button" onClick={() => setSound((s) => !s)} aria-label={sound ? "Mute sound" : "Turn on sound"}>{sound ? "🔊" : "🔇"}</button><button className="round-button" type="button" onClick={() => setMenuOpen(true)} aria-label="Menu">☰</button></div></nav>
+    <nav className="topbar" aria-label="Main navigation"><BrandLogo/><div className="nav-actions"><button className="battle" type="button" onClick={() => setMenuOpen(true)}>🏆 <span>CLASS BATTLE</span></button><button className="round-button" type="button" onClick={() => setSound((s) => !s)} aria-label={sound ? "Mute sound" : "Turn on sound"}>{sound ? "🔊" : "🔇"}</button><button className="round-button" type="button" onClick={() => setMenuOpen(true)} aria-label="Menu">☰</button></div></nav>
     <section className="hero"><p className="eyebrow">TELLmeMORE PLAYGROUND</p><h1>PICK YOUR <em>ZONE</em></h1><p>Choose your age. Jump in. Have fun.</p></section>
-    <section className="zone-grid" aria-label="Age zones">{zoneData.map((zone) => <article className={`zone-card ${zone.tone}`} key={zone.id}><div className="zone-glow"/><div className="zone-icon" aria-hidden="true">{zone.icon}</div><div className="zone-art" aria-hidden="true"><span>{zone.icon}</span><i/></div><div className="zone-copy"><h2>{zone.age}</h2><strong>YEARS OLD</strong><h3>{zone.title}</h3><p>{zone.tagline}</p><button type="button" onClick={() => setGame(zone.id)}>{zone.action}<b>›</b></button></div></article>)}</section>
+    <section className="zone-grid" aria-label="Age zones">{zoneData.map((zone) => <article className={`zone-card ${zone.tone}`} key={zone.id}><div className="zone-glow"/><div className={`zone-art cover-shot cover-${zone.id}`} aria-hidden="true"/><div className="zone-copy"><h2>{zone.age}</h2><strong>YEARS OLD</strong><h3 className="sr-only">{zone.title}</h3><p>{zone.tagline}</p><button type="button" aria-label={`${zone.action}: ${zone.title}`} onClick={() => setGame(zone.id)}>{zone.action}<b>›</b></button></div></article>)}</section>
     {menuOpen && <div className="modal-shade" role="dialog" aria-modal="true" aria-label="Playground menu" onClick={() => setMenuOpen(false)}><div className="mini-modal" onClick={(e) => e.stopPropagation()}><button className="modal-close" type="button" onClick={() => setMenuOpen(false)}>×</button><span>⚡</span><h2>READY TO PLAY?</h2><p>Pick any age zone. Every game takes just a few minutes and works with one finger.</p><button className="primary-game-button" type="button" onClick={() => setMenuOpen(false)}>LET'S GO</button></div></div>}
   </main>;
+}
+
+function BrandLogo() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) return;
+    const image = new Image();
+    image.src = "/tmm-logo-source.png";
+    image.onload = () => {
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(image, 66, 405, 895, 220, 0, 0, canvas.width, canvas.height);
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+      for (let index = 0; index < pixels.data.length; index += 4) {
+        if (pixels.data[index] > 238 && pixels.data[index + 1] > 238 && pixels.data[index + 2] > 238) pixels.data[index + 3] = 0;
+      }
+      context.putImageData(pixels, 0, 0);
+    };
+  }, []);
+  return <a className="brand" href="#" aria-label="TELLmeMORE home"><canvas ref={canvasRef} width="895" height="220" role="img" aria-label="TELLmeMORE"/></a>;
 }

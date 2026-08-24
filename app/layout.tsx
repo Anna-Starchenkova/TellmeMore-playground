@@ -5,11 +5,11 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://tellmemore-playground.brovarnikan.chatgpt.site"),
   title: "TELLmeMORE Playground",
   description: "Four fast English adventures for curious players aged 5 and up.",
-  icons: { icon: "/favicon.svg" },
+  icons: { icon: "/tmm-logo-source.png", shortcut: "/tmm-logo-source.png" },
   openGraph: {
     title: "TELLmeMORE Playground",
     description: "Pick your zone. Four fast English adventures for curious players aged 5 and up.",
-    images: [{ url: "/og.png", width: 1672, height: 941, alt: "TELLmeMORE Playground — Pick Your Zone" }],
+    images: [{ url: "/og.png", width: 1659, height: 948, alt: "TELLmeMORE Playground — Pick Your Zone" }],
   },
   twitter: {
     card: "summary_large_image",
