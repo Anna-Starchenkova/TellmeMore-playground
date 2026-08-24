@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.PUBLIC_SITE_URL ?? "http://localhost:3000"),
+  metadataBase: new URL("https://tellmemore-playground.brovarnikan.chatgpt.site"),
   title: "TELLmeMORE Playground",
   description: "Four fast English adventures for curious players aged 5 and up.",
   icons: { icon: "/favicon.svg" },
