@@ -1,19 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 
 type GameId = "feed" | "pack" | "survival" | "cringe";
 type ResultMood = "good" | "bad" | null;
 
 const feedRounds = [
-  { want: "banana", options: [["banana", "🍌"], ["apple", "🍎"], ["cookie", "🍪"], ["carrot", "🥕"], ["milk", "🥛"]] },
-  { want: "pizza", options: [["pizza", "🍕"], ["cheese", "🧀"], ["bread", "🍞"], ["grapes", "🍇"]] },
-  { want: "ice cream", options: [["ice cream", "🍦"], ["cake", "🍰"], ["lemon", "🍋"], ["watermelon", "🍉"], ["pear", "🍐"]] },
-  { want: "carrot", options: [["carrot", "🥕"], ["strawberry", "🍓"], ["egg", "🥚"], ["sandwich", "🥪"]] },
-  { want: "apple", options: [["apple", "🍎"], ["banana", "🍌"], ["milk", "🥛"], ["pizza", "🍕"], ["cookie", "🍪"]] },
-  { want: "cookie", options: [["cookie", "🍪"], ["pear", "🍐"], ["cheese", "🧀"], ["grapes", "🍇"]] },
-  { want: "milk", options: [["milk", "🥛"], ["lemon", "🍋"], ["bread", "🍞"], ["cake", "🍰"], ["egg", "🥚"]] },
-  { want: "watermelon", options: [["watermelon", "🍉"], ["strawberry", "🍓"], ["ice cream", "🍦"], ["sandwich", "🥪"]] },
+  { want: "banana", prompt: "I want a banana!", options: [["banana", "🍌"], ["apple", "🍎"], ["cookie", "🍪"], ["carrot", "🥕"], ["milk", "🥛"]] },
+  { want: "pizza", prompt: "I want some pizza!", options: [["pizza", "🍕"], ["cheese", "🧀"], ["bread", "🍞"], ["grapes", "🍇"]] },
+  { want: "ice cream", prompt: "I want some ice cream!", options: [["ice cream", "🍦"], ["cake", "🍰"], ["lemon", "🍋"], ["watermelon", "🍉"], ["pear", "🍐"]] },
+  { want: "carrot", prompt: "I want a carrot!", options: [["carrot", "🥕"], ["strawberry", "🍓"], ["egg", "🥚"], ["sandwich", "🥪"]] },
+  { want: "apple", prompt: "I want an apple!", options: [["apple", "🍎"], ["banana", "🍌"], ["milk", "🥛"], ["pizza", "🍕"], ["cookie", "🍪"]] },
+  { want: "cookie", prompt: "I want a cookie!", options: [["cookie", "🍪"], ["pear", "🍐"], ["cheese", "🧀"], ["grapes", "🍇"]] },
+  { want: "milk", prompt: "I want some milk!", options: [["milk", "🥛"], ["lemon", "🍋"], ["bread", "🍞"], ["cake", "🍰"], ["egg", "🥚"]] },
+  { want: "watermelon", prompt: "I want some watermelon!", options: [["watermelon", "🍉"], ["strawberry", "🍓"], ["ice cream", "🍦"], ["sandwich", "🥪"]] },
 ] as const;
 
 const schoolItems = [
@@ -60,7 +60,7 @@ const cringePhrases = [
 ];
 
 const zoneData: { id: GameId; age: string; title: string; tagline: string; icon: string; action: string; tone: string }[] = [
-  { id: "feed", age: "5–7", title: "FEED THE MONSTER", tagline: "Listen, look and tap!", icon: "👾", action: "PLAY", tone: "lime" },
+  { id: "feed", age: "5–7", title: "FEED THE MONSTER", tagline: "Listen, drag and feed!", icon: "👾", action: "PLAY", tone: "lime" },
   { id: "pack", age: "7–9", title: "PACK MY BAG", tagline: "Read, match and pack!", icon: "🎒", action: "EXPLORE", tone: "blue" },
   { id: "survival", age: "10–12", title: "ENGLISH SURVIVAL", tagline: "Choose wisely. Run fast.", icon: "🧟", action: "CHALLENGE", tone: "purple" },
   { id: "cringe", age: "14+", title: "CRINGE OR CORRECT?", tagline: "Think fast. Judge harder.", icon: "💀", action: "SURVIVE", tone: "red" },
@@ -100,23 +100,52 @@ function FinalScreen({ icon, title, score, total, detail, tone, onAgain, onHome 
 }
 
 function FeedGame({ sound, onHome }: { sound: boolean; onHome: () => void }) {
-  const [round, setRound] = useState(0); const [score, setScore] = useState(0); const [reaction, setReaction] = useState<ResultMood>(null); const [picked, setPicked] = useState(""); const [done, setDone] = useState(false);
+  const [round, setRound] = useState(0); const [score, setScore] = useState(0); const [reaction, setReaction] = useState<ResultMood>(null); const [picked, setPicked] = useState(""); const [done, setDone] = useState(false); const [hintDismissed, setHintDismissed] = useState(false);
+  const [drag, setDrag] = useState<{ name: string; x: number; y: number; sx: number; sy: number; near: boolean } | null>(null); const [look, setLook] = useState({ x: 0, y: 0 });
+  const mouthRef = useRef<HTMLDivElement>(null);
   const data = feedRounds[round];
-  useEffect(() => { if (!done) { const timer = setTimeout(() => speak(`I want a ${data.want}!`, sound), 350); return () => clearTimeout(timer); } }, [round, done, data.want, sound]);
-  const choose = (name: string) => {
+  useEffect(() => { if (!done) { const timer = setTimeout(() => speak(data.prompt, sound), 350); return () => clearTimeout(timer); } }, [round, done, data.prompt, sound]);
+  const finishDrop = (name: string) => {
     if (reaction) return; const correct = name === data.want; setPicked(name); setReaction(correct ? "good" : "bad");
-    if (correct) setScore((s) => s + 1); speak(correct ? "Yummy! Thank you!" : "Oops! Try the next one!", sound);
-    setTimeout(() => { if (round === feedRounds.length - 1) setDone(true); else setRound((r) => r + 1); setReaction(null); setPicked(""); }, 900);
+    if (correct) {
+      setScore((value) => value + 1); speak("Yum! Thank you!", sound);
+      setTimeout(() => { if (round === feedRounds.length - 1) setDone(true); else setRound((value) => value + 1); setReaction(null); setPicked(""); }, 1050);
+    } else {
+      speak("Bleh!", sound); setTimeout(() => { setReaction(null); setPicked(""); }, 950);
+    }
   };
-  if (done) return <FinalScreen icon="👾" title="MONSTER FED!" score={score} total={feedRounds.length} detail={score > 6 ? "SUPER TASTY!" : "YUMMY WORK!"} tone="lime" onAgain={() => { setRound(0); setScore(0); setDone(false); }} onHome={onHome} />;
+  const pointerDown = (event: ReactPointerEvent<HTMLButtonElement>, name: string) => {
+    if (reaction) return; event.currentTarget.setPointerCapture(event.pointerId); setHintDismissed(true); setDrag({ name, x: 0, y: 0, sx: event.clientX, sy: event.clientY, near: false });
+  };
+  const pointerMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (!drag || drag.name !== event.currentTarget.dataset.name) return; const mouth = mouthRef.current?.getBoundingClientRect(); if (!mouth) return;
+    const near = event.clientX >= mouth.left - 55 && event.clientX <= mouth.right + 55 && event.clientY >= mouth.top - 55 && event.clientY <= mouth.bottom + 55;
+    const centerX = mouth.left + mouth.width / 2; const centerY = mouth.top + mouth.height / 2;
+    setLook({ x: Math.max(-12, Math.min(12, (event.clientX - centerX) / 11)), y: Math.max(-9, Math.min(9, (event.clientY - centerY) / 13)) });
+    setDrag((current) => current ? { ...current, x: event.clientX - current.sx, y: event.clientY - current.sy, near } : null);
+  };
+  const pointerUp = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (!drag) return; const mouth = mouthRef.current?.getBoundingClientRect(); const overMouth = !!mouth && event.clientX >= mouth.left - 12 && event.clientX <= mouth.right + 12 && event.clientY >= mouth.top - 12 && event.clientY <= mouth.bottom + 12; const name = drag.name;
+    setDrag(null); setLook({ x: 0, y: 0 }); if (overMouth) finishDrop(name);
+  };
+  const pointerCancel = () => { setDrag(null); setLook({ x: 0, y: 0 }); };
+  if (done) return <FinalScreen icon="👾" title="MONSTER FED!" score={score} total={feedRounds.length} detail="SUPER TASTY!" tone="lime" onAgain={() => { setRound(0); setScore(0); setDone(false); setHintDismissed(false); }} onHome={onHome} />;
+  const pickedEmoji = data.options.find(([name]) => name === picked)?.[1];
+  const labStyle = { "--look-x": `${look.x}px`, "--look-y": `${look.y}px` } as CSSProperties;
   return <GameFrame title="FEED THE MONSTER" round={round} total={feedRounds.length} onBack={onHome}>
-    <section className="feed-stage">
-      <button type="button" className="speech-bubble" onClick={() => speak(`I want a ${data.want}!`, sound)} aria-label="Repeat request"><span>🔊</span> I want a {data.want}!</button>
-      <div className={`monster ${reaction === "good" ? "monster-happy" : reaction === "bad" ? "monster-spit" : ""}`} aria-label="Friendly hungry monster"><i className="horn h1"/><i className="horn h2"/><div className="monster-eye e1"/><div className="monster-eye e2"/><div className="monster-mouth">{reaction === "good" ? "♥" : reaction === "bad" ? " bleh " : ""}</div></div>
-      <div className="food-field">
-        {data.options.map(([name, emoji], index) => <button type="button" key={name} aria-label={name} onClick={() => choose(name)} className={`food-option food-${index} ${picked === name ? reaction === "good" ? "food-eaten" : "food-spit" : ""}`}><span>{emoji}</span></button>)}
+    <section className="feed-stage feed-3d-stage">
+      <div className={`monster-lab ${drag ? "is-tracking" : ""} ${drag?.near ? "is-near" : ""} ${reaction === "good" ? "is-chewing" : reaction === "bad" ? "is-disgusted" : ""}`} style={labStyle}>
+        <button type="button" className="speech-bubble" onClick={() => speak(data.prompt, sound)} aria-label="Repeat request"><span>🔊</span>{data.prompt}</button>
+        <i className="tracking-glint glint-left"/><i className="tracking-glint glint-right"/>
+        <div ref={mouthRef} className="mouth-drop" aria-label="Monster mouth drop zone"/>
+        {reaction === "good" && <div className="yum-burst" aria-hidden="true">♥ ✦ ♥</div>}
+        {reaction === "bad" && pickedEmoji && <div className="spit-food" aria-hidden="true">{pickedEmoji}</div>}
+        <div className="food-field">
+          {data.options.map(([name, emoji], index) => <button type="button" key={name} data-name={name} aria-label={`Drag ${name} to the monster`} onPointerDown={(event) => pointerDown(event, name)} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerCancel} className={`food-option food-${index} ${drag?.name === name ? "food-dragging" : ""} ${picked === name && reaction === "good" ? "food-fed" : ""} ${picked === name && reaction === "bad" ? "food-rejected" : ""}`} style={drag?.name === name ? { transform: `translate3d(${drag.x}px, ${drag.y}px, 0) scale(1.16)`, zIndex: 30 } : undefined}><span>{emoji}</span><b>{name}</b></button>)}
+        </div>
+        {round === 0 && !hintDismissed && <div className="drag-hint" aria-hidden="true"><span>☝️</span><i/></div>}
       </div>
-      <p className={`instant-feedback ${reaction ?? ""}`}>{reaction === "good" ? "YUMMY! ★" : reaction === "bad" ? "PTOOIE! 😝" : "Tap the food the monster wants"}</p>
+      <p className="feed-instruction">DRAG THE FOOD TO THE MONSTER</p>
     </section>
   </GameFrame>;
 }
