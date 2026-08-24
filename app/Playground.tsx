@@ -33,13 +33,28 @@ const schoolItems = [
 ] as const;
 
 const packRounds = [
-  { task: "I need a book and a pen.", targets: ["book", "pen"], options: ["book", "pen", "pencil-a", "notebook", "eraser", "pencil-case", "water-bottle"] },
-  { task: "I need two pencils.", targets: ["pencil", "pencil"], options: ["pencil-a", "pencil-b", "pen", "ruler", "eraser", "notebook", "glue"] },
-  { task: "I need a red notebook.", targets: ["red notebook"], options: ["red-notebook", "blue-book", "book", "notebook", "pen", "pencil-a", "water-bottle"] },
-  { task: "I need a pencil and an eraser.", targets: ["pencil", "eraser"], options: ["pencil-a", "eraser", "pen", "ruler", "notebook", "scissors", "glue"] },
-  { task: "I need a blue book and a pencil case.", targets: ["blue book", "pencil case"], options: ["blue-book", "pencil-case", "book", "red-notebook", "pen", "ruler", "water-bottle"] },
-  { task: "I need a ruler, some glue, and scissors.", targets: ["ruler", "glue", "scissors"], options: ["ruler", "glue", "scissors", "pen", "pencil-a", "eraser", "water-bottle"] },
+  { task: "I need a book and a pen.", targets: ["book", "pen"], options: ["notebook", "book", "eraser", "pencil-case", "pen", "water-bottle", "pencil-a"] },
+  { task: "I need two pencils.", targets: ["pencil", "pencil"], options: ["eraser", "pencil-a", "pen", "glue", "pencil-b", "ruler", "notebook"] },
+  { task: "I need a red notebook.", targets: ["red notebook"], options: ["blue-book", "pen", "notebook", "red-notebook", "water-bottle", "book", "pencil-a"] },
+  { task: "I need a pencil and an eraser.", targets: ["pencil", "eraser"], options: ["ruler", "pencil-a", "notebook", "glue", "scissors", "eraser", "pen"] },
+  { task: "I need a blue book and a pencil case.", targets: ["blue book", "pencil case"], options: ["book", "pen", "pencil-case", "red-notebook", "water-bottle", "blue-book", "ruler"] },
+  { task: "I need a ruler, some glue, and scissors.", targets: ["ruler", "glue", "scissors"], options: ["pen", "scissors", "water-bottle", "ruler", "pencil-a", "glue", "eraser"] },
 ] as const;
+
+function shufflePackOptions(data: typeof packRounds[number]) {
+  const order = [...data.options] as string[];
+  for (let index = order.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [order[index], order[swapIndex]] = [order[swapIndex], order[index]];
+  }
+  const targetNames = new Set<string>(data.targets);
+  const firstItem = schoolItems.find((item) => item.id === order[0]);
+  if (firstItem && targetNames.has(firstItem.name)) {
+    const distractorIndex = order.findIndex((id, index) => index > 0 && !targetNames.has(schoolItems.find((item) => item.id === id)?.name ?? ""));
+    if (distractorIndex > 0) [order[0], order[distractorIndex]] = [order[distractorIndex], order[0]];
+  }
+  return order;
+}
 
 const survivalRounds = [
   { q: "She ___ to school every day.", choices: ["goes", "go"], correct: "goes" },
@@ -159,11 +174,12 @@ function FeedGame({ sound, onHome }: { sound: boolean; onHome: () => void }) {
 }
 
 function PackGame({ sound, onHome }: { sound: boolean; onHome: () => void }) {
-  const [round, setRound] = useState(0); const [score, setScore] = useState(0); const [remaining, setRemaining] = useState<string[]>([...packRounds[0].targets]); const [packed, setPacked] = useState<string[]>([]); const [used, setUsed] = useState<string[]>([]); const [reaction, setReaction] = useState<ResultMood>(null); const [done, setDone] = useState(false); const [ready, setReady] = useState(false); const [hintDismissed, setHintDismissed] = useState(false); const [attempted, setAttempted] = useState(""); const [dropOffset, setDropOffset] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [round, setRound] = useState(0); const [score, setScore] = useState(0); const [remaining, setRemaining] = useState<string[]>([...packRounds[0].targets]); const [itemOrder, setItemOrder] = useState<string[]>([...packRounds[0].options]); const [packed, setPacked] = useState<string[]>([]); const [used, setUsed] = useState<string[]>([]); const [reaction, setReaction] = useState<ResultMood>(null); const [done, setDone] = useState(false); const [ready, setReady] = useState(false); const [hintDismissed, setHintDismissed] = useState(false); const [attempted, setAttempted] = useState(""); const [dropOffset, setDropOffset] = useState<{ id: string; x: number; y: number } | null>(null);
   const [drag, setDrag] = useState<{ id: string; x: number; y: number; sx: number; sy: number; moved: boolean; near: boolean } | null>(null); const bagRef = useRef<HTMLDivElement>(null);
   const data = packRounds[round];
   useEffect(() => { if (!done) { const timer = setTimeout(() => speak(data.task, sound), 350); return () => clearTimeout(timer); } }, [round, done, data.task, sound]);
-  const startRound = (next: number) => { setRound(next); setRemaining([...packRounds[next].targets]); setPacked([]); setUsed([]); setReaction(null); setAttempted(""); setDropOffset(null); setReady(false); };
+  useEffect(() => { setItemOrder(shufflePackOptions(packRounds[0])); }, []);
+  const startRound = (next: number) => { setRound(next); setRemaining([...packRounds[next].targets]); setItemOrder(shufflePackOptions(packRounds[next])); setPacked([]); setUsed([]); setReaction(null); setAttempted(""); setDropOffset(null); setReady(false); };
   const tryPack = (id: string) => {
     if (reaction || used.includes(id)) return; const item = schoolItems.find((entry) => entry.id === id); if (!item) return;
     const wantedAt = remaining.indexOf(item.name); const wanted = wantedAt >= 0; setAttempted(id); setReaction(wanted ? "good" : "bad");
@@ -186,7 +202,7 @@ function PackGame({ sound, onHome }: { sound: boolean; onHome: () => void }) {
   };
   const pointerCancel = () => setDrag(null);
   if (done) return <FinalScreen icon="🎒" title="BAG PACKED!" score={score} total={packRounds.length} detail="READY FOR SCHOOL" tone="blue" onAgain={() => { startRound(0); setScore(0); setDone(false); setHintDismissed(false); }} onHome={onHome} />;
-  const items = data.options.map((id) => schoolItems.find((item) => item.id === id)).filter((item): item is NonNullable<typeof item> => !!item && !used.includes(item.id));
+  const items = itemOrder.map((id) => schoolItems.find((item) => item.id === id)).filter((item): item is NonNullable<typeof item> => !!item && !used.includes(item.id));
   return <GameFrame title="PACK MY BAG" round={round} total={packRounds.length} onBack={onHome} tone="blue">
     <section className="pack-stage pack-3d-stage">
       <div className={`pack-room ${drag?.near ? "bag-near" : ""} ${reaction === "bad" ? "bag-rejecting" : ""} ${ready ? "bag-ready" : ""}`}>
