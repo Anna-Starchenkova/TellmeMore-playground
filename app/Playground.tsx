@@ -33,12 +33,12 @@ const schoolItems = [
 ] as const;
 
 const packRounds = [
-  { task: "I need a book and a pen.", targets: ["book", "pen"], options: ["notebook", "book", "eraser", "pencil-case", "pen", "water-bottle", "pencil-a"] },
-  { task: "I need two pencils.", targets: ["pencil", "pencil"], options: ["eraser", "pencil-a", "pen", "glue", "pencil-b", "ruler", "notebook"] },
-  { task: "I need a red notebook.", targets: ["red notebook"], options: ["blue-book", "pen", "notebook", "red-notebook", "water-bottle", "book", "pencil-a"] },
-  { task: "I need a pencil and an eraser.", targets: ["pencil", "eraser"], options: ["ruler", "pencil-a", "notebook", "glue", "scissors", "eraser", "pen"] },
-  { task: "I need a blue book and a pencil case.", targets: ["blue book", "pencil case"], options: ["book", "pen", "pencil-case", "red-notebook", "water-bottle", "blue-book", "ruler"] },
-  { task: "I need a ruler, some glue, and scissors.", targets: ["ruler", "glue", "scissors"], options: ["pen", "scissors", "water-bottle", "ruler", "pencil-a", "glue", "eraser"] },
+  { task: "I need a book and a pen.", audio: "/audio/pack/mission-1.mp3", targets: ["book", "pen"], options: ["notebook", "book", "eraser", "pencil-case", "pen", "water-bottle", "pencil-a"] },
+  { task: "I need two pencils.", audio: "/audio/pack/mission-2.mp3", targets: ["pencil", "pencil"], options: ["eraser", "pencil-a", "pen", "glue", "pencil-b", "ruler", "notebook"] },
+  { task: "I need a red notebook.", audio: "/audio/pack/mission-3.mp3", targets: ["red notebook"], options: ["blue-book", "pen", "notebook", "red-notebook", "water-bottle", "book", "pencil-a"] },
+  { task: "I need a pencil and an eraser.", audio: "/audio/pack/mission-4.mp3", targets: ["pencil", "eraser"], options: ["ruler", "pencil-a", "notebook", "glue", "scissors", "eraser", "pen"] },
+  { task: "I need a blue book and a pencil case.", audio: "/audio/pack/mission-5.mp3", targets: ["blue book", "pencil case"], options: ["book", "pen", "pencil-case", "red-notebook", "water-bottle", "blue-book", "ruler"] },
+  { task: "I need a ruler, some glue, and scissors.", audio: "/audio/pack/mission-6.mp3", targets: ["ruler", "glue", "scissors"], options: ["pen", "scissors", "water-bottle", "ruler", "pencil-a", "glue", "eraser"] },
 ] as const;
 
 function shufflePackOptions(data: typeof packRounds[number]) {
@@ -99,16 +99,6 @@ const zoneData: { id: GameId; age: string; title: string; tagline: string; icon:
   { id: "cringe", age: "14+", title: "CRINGE OR CORRECT?", tagline: "Think fast. Judge harder.", icon: "💀", action: "SURVIVE", tone: "red" },
 ];
 
-function speak(text: string, enabled: boolean) {
-  if (!enabled || typeof window === "undefined" || !("speechSynthesis" in window)) return;
-  window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = "en-US";
-  utterance.rate = 0.86;
-  utterance.pitch = 1.18;
-  window.speechSynthesis.speak(utterance);
-}
-
 type MonsterVoiceMood = "request" | "happy" | "funny";
 
 function findNaturalEnglishVoice(voices: SpeechSynthesisVoice[]) {
@@ -139,12 +129,12 @@ function speakMonster(text: string, enabled: boolean, mood: MonsterVoiceMood = "
   synthesizer.speak(utterance);
 }
 
-let activeMonsterAudio: HTMLAudioElement | null = null;
+let activeRecordedAudio: HTMLAudioElement | null = null;
 
-function playMonsterLine(source: string, fallbackText: string, enabled: boolean, mood: MonsterVoiceMood = "request") {
+function playRecordedLine(source: string, fallbackText: string, enabled: boolean, mood: MonsterVoiceMood = "request") {
   if (!enabled || typeof window === "undefined") return;
-  activeMonsterAudio?.pause();
-  const audio = new Audio(source); activeMonsterAudio = audio; audio.preload = "auto"; audio.volume = 0.96;
+  activeRecordedAudio?.pause();
+  const audio = new Audio(source); activeRecordedAudio = audio; audio.preload = "auto"; audio.volume = 0.96;
   void audio.play().catch((error: unknown) => {
     if (error instanceof DOMException && error.name === "NotAllowedError") return;
     speakMonster(fallbackText, enabled, mood);
@@ -179,14 +169,14 @@ function FeedGame({ sound, onHome }: { sound: boolean; onHome: () => void }) {
   const [drag, setDrag] = useState<{ name: string; x: number; y: number; sx: number; sy: number; near: boolean } | null>(null); const [look, setLook] = useState({ x: 0, y: 0 });
   const mouthRef = useRef<HTMLDivElement>(null);
   const data = feedRounds[round];
-  useEffect(() => { if (!done) { const timer = setTimeout(() => playMonsterLine(data.audio, data.prompt, sound), 350); return () => clearTimeout(timer); } }, [round, done, data.audio, data.prompt, sound]);
+  useEffect(() => { if (!done) { const timer = setTimeout(() => playRecordedLine(data.audio, data.prompt, sound), 350); return () => clearTimeout(timer); } }, [round, done, data.audio, data.prompt, sound]);
   const finishDrop = (name: string) => {
     if (reaction) return; const correct = name === data.want; setPicked(name); setReaction(correct ? "good" : "bad");
     if (correct) {
-      setScore((value) => value + 1); playMonsterLine("/audio/monster/yum.mp3", "Yum! Thank you!", sound, "happy");
+      setScore((value) => value + 1); playRecordedLine("/audio/monster/yum.mp3", "Yum! Thank you!", sound, "happy");
       setTimeout(() => { if (round === feedRounds.length - 1) setDone(true); else setRound((value) => value + 1); setReaction(null); setPicked(""); }, 1050);
     } else {
-      playMonsterLine("/audio/monster/bleh.mp3", "Bleh!", sound, "funny"); setTimeout(() => { setReaction(null); setPicked(""); }, 950);
+      playRecordedLine("/audio/monster/bleh.mp3", "Bleh!", sound, "funny"); setTimeout(() => { setReaction(null); setPicked(""); }, 950);
     }
   };
   const pointerDown = (event: ReactPointerEvent<HTMLButtonElement>, name: string) => {
@@ -210,7 +200,7 @@ function FeedGame({ sound, onHome }: { sound: boolean; onHome: () => void }) {
   return <GameFrame title="FEED THE MONSTER" round={round} total={feedRounds.length} onBack={onHome}>
     <section className="feed-stage feed-3d-stage">
       <div className={`monster-lab ${drag ? "is-tracking" : ""} ${drag?.near ? "is-near" : ""} ${reaction === "good" ? "is-chewing" : reaction === "bad" ? "is-disgusted" : ""}`} style={labStyle}>
-        <button type="button" className="speech-bubble" onClick={() => playMonsterLine(data.audio, data.prompt, sound)} aria-label="Repeat request"><span>🔊</span>{data.prompt}</button>
+        <button type="button" className="speech-bubble" onClick={() => playRecordedLine(data.audio, data.prompt, sound)} aria-label="Repeat request"><span>🔊</span>{data.prompt}</button>
         <i className="tracking-glint glint-left"/><i className="tracking-glint glint-right"/>
         <div ref={mouthRef} className="mouth-drop" aria-label="Monster mouth drop zone"/>
         {reaction === "good" && <div className="yum-burst" aria-hidden="true">♥ ✦ ♥</div>}
@@ -229,7 +219,7 @@ function PackGame({ sound, onHome }: { sound: boolean; onHome: () => void }) {
   const [round, setRound] = useState(0); const [score, setScore] = useState(0); const [remaining, setRemaining] = useState<string[]>([...packRounds[0].targets]); const [itemOrder, setItemOrder] = useState<string[]>([...packRounds[0].options]); const [packed, setPacked] = useState<string[]>([]); const [used, setUsed] = useState<string[]>([]); const [reaction, setReaction] = useState<ResultMood>(null); const [done, setDone] = useState(false); const [ready, setReady] = useState(false); const [hintDismissed, setHintDismissed] = useState(false); const [attempted, setAttempted] = useState(""); const [dropOffset, setDropOffset] = useState<{ id: string; x: number; y: number } | null>(null);
   const [drag, setDrag] = useState<{ id: string; x: number; y: number; sx: number; sy: number; moved: boolean; near: boolean } | null>(null); const bagRef = useRef<HTMLDivElement>(null);
   const data = packRounds[round];
-  useEffect(() => { if (!done) { const timer = setTimeout(() => speak(data.task, sound), 350); return () => clearTimeout(timer); } }, [round, done, data.task, sound]);
+  useEffect(() => { if (!done) { const timer = setTimeout(() => playRecordedLine(data.audio, data.task, sound), 350); return () => clearTimeout(timer); } }, [round, done, data.audio, data.task, sound]);
   useEffect(() => { setItemOrder(shufflePackOptions(packRounds[0])); }, []);
   const startRound = (next: number) => { setRound(next); setRemaining([...packRounds[next].targets]); setItemOrder(shufflePackOptions(packRounds[next])); setPacked([]); setUsed([]); setReaction(null); setAttempted(""); setDropOffset(null); setReady(false); };
   const tryPack = (id: string) => {
@@ -239,7 +229,7 @@ function PackGame({ sound, onHome }: { sound: boolean; onHome: () => void }) {
     setHintDismissed(true); const next = [...remaining]; next.splice(wantedAt, 1); setRemaining(next);
     setTimeout(() => { setUsed((value) => [...value, id]); setPacked((value) => [...value, item.emoji]); setAttempted(""); setDropOffset(null); }, 380);
     if (next.length) { setTimeout(() => setReaction(null), 620); return; }
-    setScore((value) => value + 1); setReady(true); speak("Ready!", sound);
+    setScore((value) => value + 1); setReady(true); playRecordedLine("/audio/pack/ready.mp3", "Ready!", sound, "happy");
     setTimeout(() => { if (round === packRounds.length - 1) setDone(true); else startRound(round + 1); }, 1150);
   };
   const pointerDown = (event: ReactPointerEvent<HTMLButtonElement>, id: string) => { if (reaction || used.includes(id)) return; event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); setDrag({ id, x: 0, y: 0, sx: event.clientX, sy: event.clientY, moved: false, near: false }); };
@@ -258,7 +248,7 @@ function PackGame({ sound, onHome }: { sound: boolean; onHome: () => void }) {
   return <GameFrame title="PACK MY BAG" round={round} total={packRounds.length} onBack={onHome} tone="blue">
     <section className="pack-stage pack-3d-stage">
       <div className={`pack-room ${drag?.near ? "bag-near" : ""} ${reaction === "bad" ? "bag-rejecting" : ""} ${ready ? "bag-ready" : ""}`}>
-        <button type="button" className="pack-mission" onClick={() => speak(data.task, sound)} aria-label="Listen to the mission"><span>MISSION</span><i aria-hidden="true">🔊</i><strong>{data.task}</strong></button>
+        <button type="button" className="pack-mission" onClick={() => playRecordedLine(data.audio, data.task, sound)} aria-label="Listen to the mission"><span>MISSION</span><i aria-hidden="true">🔊</i><strong>{data.task}</strong></button>
         <div ref={bagRef} className="bag-drop-zone" aria-label="Open backpack drop zone"><span>{ready ? "READY!" : drag?.near ? "LET GO!" : "DROP HERE"}</span>{packed.map((emoji, index) => <i key={`${emoji}-${index}`} aria-hidden="true">{emoji}</i>)}</div>
         {reaction === "good" && <div className="pack-sparkles" aria-hidden="true">✦ ✓ ✦</div>}
         <div className="pack-item-dock">
