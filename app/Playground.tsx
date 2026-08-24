@@ -17,21 +17,29 @@ const feedRounds = [
 ] as const;
 
 const schoolItems = [
-  { id: "book", name: "book", emoji: "📘" }, { id: "pen", name: "pen", emoji: "🖊️" },
-  { id: "pencil1", name: "pencil", emoji: "✏️" }, { id: "pencil2", name: "pencil", emoji: "✏️" },
-  { id: "red-pencil", name: "red pencil", emoji: "✏️" }, { id: "blue-book", name: "blue book", emoji: "📘" },
-  { id: "ruler", name: "ruler", emoji: "📏" }, { id: "notebook", name: "notebook", emoji: "📓" },
-  { id: "eraser", name: "eraser", emoji: "▰" }, { id: "scissors", name: "scissors", emoji: "✂️" },
-];
+  { id: "book", name: "book", label: "BOOK", emoji: "📘", hue: "205 93% 58%" },
+  { id: "blue-book", name: "blue book", label: "BLUE BOOK", emoji: "📘", hue: "213 100% 55%" },
+  { id: "pen", name: "pen", label: "PEN", emoji: "🖊️", hue: "201 93% 60%" },
+  { id: "pencil-a", name: "pencil", label: "PENCIL", emoji: "✏️", hue: "43 100% 61%" },
+  { id: "pencil-b", name: "pencil", label: "PENCIL", emoji: "✏️", hue: "43 100% 61%" },
+  { id: "eraser", name: "eraser", label: "ERASER", emoji: "🧼", hue: "346 94% 72%" },
+  { id: "notebook", name: "notebook", label: "NOTEBOOK", emoji: "📓", hue: "267 82% 68%" },
+  { id: "red-notebook", name: "red notebook", label: "RED NOTEBOOK", emoji: "📕", hue: "2 91% 64%" },
+  { id: "ruler", name: "ruler", label: "RULER", emoji: "📏", hue: "49 94% 59%" },
+  { id: "pencil-case", name: "pencil case", label: "PENCIL CASE", emoji: "👝", hue: "24 96% 58%" },
+  { id: "water-bottle", name: "water bottle", label: "WATER BOTTLE", emoji: "🧴", hue: "104 67% 57%" },
+  { id: "scissors", name: "scissors", label: "SCISSORS", emoji: "✂️", hue: "187 85% 55%" },
+  { id: "glue", name: "glue", label: "GLUE", emoji: "🧴", hue: "38 95% 62%" },
+] as const;
 
 const packRounds = [
-  { task: "I need a book and a pen", targets: ["book", "pen"] },
-  { task: "I need two pencils", targets: ["pencil", "pencil"] },
-  { task: "Pack a ruler and an eraser", targets: ["ruler", "eraser"] },
-  { task: "I need a blue book", targets: ["blue book"] },
-  { task: "Pack a notebook and scissors", targets: ["notebook", "scissors"] },
-  { task: "I need a red pencil and a book", targets: ["red pencil", "book"] },
-];
+  { task: "I need a book and a pen.", targets: ["book", "pen"], options: ["book", "pen", "pencil-a", "notebook", "eraser", "pencil-case", "water-bottle"] },
+  { task: "I need two pencils.", targets: ["pencil", "pencil"], options: ["pencil-a", "pencil-b", "pen", "ruler", "eraser", "notebook", "glue"] },
+  { task: "I need a red notebook.", targets: ["red notebook"], options: ["red-notebook", "blue-book", "book", "notebook", "pen", "pencil-a", "water-bottle"] },
+  { task: "I need a pencil and an eraser.", targets: ["pencil", "eraser"], options: ["pencil-a", "eraser", "pen", "ruler", "notebook", "scissors", "glue"] },
+  { task: "I need a blue book and a pencil case.", targets: ["blue book", "pencil case"], options: ["blue-book", "pencil-case", "book", "red-notebook", "pen", "ruler", "water-bottle"] },
+  { task: "I need a ruler, some glue, and scissors.", targets: ["ruler", "glue", "scissors"], options: ["ruler", "glue", "scissors", "pen", "pencil-a", "eraser", "water-bottle"] },
+] as const;
 
 const survivalRounds = [
   { q: "She ___ to school every day.", choices: ["goes", "go"], correct: "goes" },
@@ -150,32 +158,47 @@ function FeedGame({ sound, onHome }: { sound: boolean; onHome: () => void }) {
   </GameFrame>;
 }
 
-function PackGame({ onHome }: { onHome: () => void }) {
-  const [round, setRound] = useState(0); const [score, setScore] = useState(0); const [remaining, setRemaining] = useState<string[]>([...packRounds[0].targets]); const [packed, setPacked] = useState<string[]>([]); const [used, setUsed] = useState<string[]>([]); const [reaction, setReaction] = useState<ResultMood>(null); const [done, setDone] = useState(false);
-  const [drag, setDrag] = useState<{ id: string; x: number; y: number; sx: number; sy: number; moved: boolean } | null>(null); const bagRef = useRef<HTMLDivElement>(null);
-  const startRound = (next: number) => { setRound(next); setRemaining([...packRounds[next].targets]); setPacked([]); setUsed([]); setReaction(null); };
+function PackGame({ sound, onHome }: { sound: boolean; onHome: () => void }) {
+  const [round, setRound] = useState(0); const [score, setScore] = useState(0); const [remaining, setRemaining] = useState<string[]>([...packRounds[0].targets]); const [packed, setPacked] = useState<string[]>([]); const [used, setUsed] = useState<string[]>([]); const [reaction, setReaction] = useState<ResultMood>(null); const [done, setDone] = useState(false); const [ready, setReady] = useState(false); const [hintDismissed, setHintDismissed] = useState(false); const [attempted, setAttempted] = useState(""); const [dropOffset, setDropOffset] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [drag, setDrag] = useState<{ id: string; x: number; y: number; sx: number; sy: number; moved: boolean; near: boolean } | null>(null); const bagRef = useRef<HTMLDivElement>(null);
+  const data = packRounds[round];
+  useEffect(() => { if (!done) { const timer = setTimeout(() => speak(data.task, sound), 350); return () => clearTimeout(timer); } }, [round, done, data.task, sound]);
+  const startRound = (next: number) => { setRound(next); setRemaining([...packRounds[next].targets]); setPacked([]); setUsed([]); setReaction(null); setAttempted(""); setDropOffset(null); setReady(false); };
   const tryPack = (id: string) => {
-    if (reaction || used.includes(id)) return; const item = schoolItems.find((it) => it.id === id); if (!item) return;
-    const wanted = remaining.includes(item.name); setReaction(wanted ? "good" : "bad");
-    if (wanted) {
-      setUsed((u) => [...u, id]); setPacked((p) => [...p, item.emoji]);
-      const next = [...remaining]; next.splice(next.indexOf(item.name), 1); setRemaining(next);
-      if (!next.length) { setScore((s) => s + 1); setTimeout(() => { if (round === packRounds.length - 1) setDone(true); else startRound(round + 1); }, 750); } else setTimeout(() => setReaction(null), 450);
-    } else setTimeout(() => setReaction(null), 520);
+    if (reaction || used.includes(id)) return; const item = schoolItems.find((entry) => entry.id === id); if (!item) return;
+    const wantedAt = remaining.indexOf(item.name); const wanted = wantedAt >= 0; setAttempted(id); setReaction(wanted ? "good" : "bad");
+    if (!wanted) { setTimeout(() => { setReaction(null); setAttempted(""); setDropOffset(null); }, 620); return; }
+    setHintDismissed(true); const next = [...remaining]; next.splice(wantedAt, 1); setRemaining(next);
+    setTimeout(() => { setUsed((value) => [...value, id]); setPacked((value) => [...value, item.emoji]); setAttempted(""); setDropOffset(null); }, 380);
+    if (next.length) { setTimeout(() => setReaction(null), 620); return; }
+    setScore((value) => value + 1); setReady(true); speak("Ready!", sound);
+    setTimeout(() => { if (round === packRounds.length - 1) setDone(true); else startRound(round + 1); }, 1150);
   };
-  const pointerDown = (e: ReactPointerEvent<HTMLButtonElement>, id: string) => { e.currentTarget.setPointerCapture(e.pointerId); setDrag({ id, x: 0, y: 0, sx: e.clientX, sy: e.clientY, moved: false }); };
-  const pointerMove = (e: ReactPointerEvent<HTMLButtonElement>) => setDrag((d) => d && d.id === e.currentTarget.dataset.id ? { ...d, x: e.clientX - d.sx, y: e.clientY - d.sy, moved: d.moved || Math.abs(e.clientX - d.sx) + Math.abs(e.clientY - d.sy) > 8 } : d);
-  const pointerUp = (e: ReactPointerEvent<HTMLButtonElement>) => { if (!drag) return; const rect = bagRef.current?.getBoundingClientRect(); const overBag = !!rect && e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom; if (!drag.moved || overBag) tryPack(drag.id); else { setReaction("bad"); setTimeout(() => setReaction(null), 400); } setDrag(null); };
-  if (done) return <FinalScreen icon="🎒" title="BAG PACKED!" score={score} total={packRounds.length} detail="READY FOR SCHOOL" tone="blue" onAgain={() => { startRound(0); setScore(0); setDone(false); }} onHome={onHome} />;
-  const required = packRounds[round].targets;
-  const items = schoolItems.filter((item) => !used.includes(item.id) && required.includes(item.name));
-  schoolItems.forEach((item) => { if (items.length < 6 && !used.includes(item.id) && !items.some((shown) => shown.id === item.id)) items.push(item); });
+  const pointerDown = (event: ReactPointerEvent<HTMLButtonElement>, id: string) => { if (reaction || used.includes(id)) return; event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); setDrag({ id, x: 0, y: 0, sx: event.clientX, sy: event.clientY, moved: false, near: false }); };
+  const pointerMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (!drag || drag.id !== event.currentTarget.dataset.id) return; event.preventDefault(); const rect = bagRef.current?.getBoundingClientRect();
+    const near = !!rect && event.clientX >= rect.left - 55 && event.clientX <= rect.right + 55 && event.clientY >= rect.top - 45 && event.clientY <= rect.bottom + 45;
+    setDrag((current) => current ? { ...current, x: event.clientX - current.sx, y: event.clientY - current.sy, moved: current.moved || Math.abs(event.clientX - current.sx) + Math.abs(event.clientY - current.sy) > 9, near } : null);
+  };
+  const pointerUp = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (!drag) return; const rect = bagRef.current?.getBoundingClientRect(); const overBag = !!rect && event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom; const droppedId = drag.id; const moved = drag.moved;
+    setDrag(null); if (moved && overBag) { setDropOffset({ id: droppedId, x: drag.x, y: drag.y - 24 }); tryPack(droppedId); }
+  };
+  const pointerCancel = () => setDrag(null);
+  if (done) return <FinalScreen icon="🎒" title="BAG PACKED!" score={score} total={packRounds.length} detail="READY FOR SCHOOL" tone="blue" onAgain={() => { startRound(0); setScore(0); setDone(false); setHintDismissed(false); }} onHome={onHome} />;
+  const items = data.options.map((id) => schoolItems.find((item) => item.id === id)).filter((item): item is NonNullable<typeof item> => !!item && !used.includes(item.id));
   return <GameFrame title="PACK MY BAG" round={round} total={packRounds.length} onBack={onHome} tone="blue">
-    <section className="pack-stage"><div className="task-card"><span>MISSION</span><h1>{packRounds[round].task}</h1></div>
-      <div className="desk-scene">
-        <div className="item-tray">{items.map((item) => <button type="button" key={item.id} data-id={item.id} aria-label={`Drag ${item.name} to the bag`} onPointerDown={(e) => pointerDown(e, item.id)} onPointerMove={pointerMove} onPointerUp={pointerUp} className={`school-item ${drag?.id === item.id ? "dragging" : ""}`} style={drag?.id === item.id ? { transform: `translate(${drag.x}px, ${drag.y}px) scale(1.12)` } : undefined}><span>{item.emoji}</span><b>{item.name}</b></button>)}</div>
-        <div ref={bagRef} className={`backpack ${reaction === "good" ? "bag-happy" : reaction === "bad" ? "bag-nope" : ""}`}><div className="bag-handle"/><div className="bag-pocket">{packed.map((emoji, i) => <span key={`${emoji}-${i}`}>{emoji}</span>)}</div><b>DROP HERE</b></div>
-      </div><p className={`instant-feedback ${reaction ?? ""}`}>{reaction === "good" ? "PACKED! ✓" : reaction === "bad" ? "BOING! NOT THIS ONE" : "Drag or tap the things you need"}</p>
+    <section className="pack-stage pack-3d-stage">
+      <div className={`pack-room ${drag?.near ? "bag-near" : ""} ${reaction === "bad" ? "bag-rejecting" : ""} ${ready ? "bag-ready" : ""}`}>
+        <button type="button" className="pack-mission" onClick={() => speak(data.task, sound)} aria-label="Listen to the mission"><span>MISSION</span><i aria-hidden="true">🔊</i><strong>{data.task}</strong></button>
+        <div ref={bagRef} className="bag-drop-zone" aria-label="Open backpack drop zone"><span>{ready ? "READY!" : drag?.near ? "LET GO!" : "DROP HERE"}</span>{packed.map((emoji, index) => <i key={`${emoji}-${index}`} aria-hidden="true">{emoji}</i>)}</div>
+        {reaction === "good" && <div className="pack-sparkles" aria-hidden="true">✦ ✓ ✦</div>}
+        <div className="pack-item-dock">
+          {items.map((item) => <button type="button" key={item.id} data-id={item.id} aria-label={`Drag ${item.name} into the backpack`} onPointerDown={(event) => pointerDown(event, item.id)} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerCancel} className={`pack-object ${drag?.id === item.id ? "is-dragging" : ""} ${attempted === item.id && reaction === "good" ? "is-packing" : ""} ${attempted === item.id && reaction === "bad" ? "is-rejected" : ""}`} style={{ "--item-hue": item.hue, "--drop-x": `${dropOffset?.id === item.id ? dropOffset.x : 0}px`, "--drop-y": `${dropOffset?.id === item.id ? dropOffset.y : 0}px`, ...(drag?.id === item.id ? { transform: `translate3d(${drag.x}px, ${drag.y - 24}px, 0) scale(1.17)`, zIndex: 40 } : {}) } as CSSProperties}><span aria-hidden="true">{item.emoji}</span><b>{item.label}</b></button>)}
+        </div>
+        {round === 0 && !hintDismissed && <div className="pack-drag-hint" aria-hidden="true"><span>☝️</span><i/></div>}
+        <p className={`pack-feedback ${reaction ?? ""}`}>{ready ? "READY!" : reaction === "good" ? "PACKED!" : reaction === "bad" ? "BOOP!" : "DRAG THE ITEMS INTO THE BAG"}</p>
+      </div>
     </section>
   </GameFrame>;
 }
@@ -213,7 +236,7 @@ function CringeGame({ onHome }: { onHome: () => void }) {
 export default function Playground() {
   const [game, setGame] = useState<GameId | null>(null); const [sound, setSound] = useState(true); const [menuOpen, setMenuOpen] = useState(false);
   if (game === "feed") return <FeedGame sound={sound} onHome={() => setGame(null)} />;
-  if (game === "pack") return <PackGame onHome={() => setGame(null)} />;
+  if (game === "pack") return <PackGame sound={sound} onHome={() => setGame(null)} />;
   if (game === "survival") return <SurvivalGame onHome={() => setGame(null)} />;
   if (game === "cringe") return <CringeGame onHome={() => setGame(null)} />;
   return <main className="home-shell">
