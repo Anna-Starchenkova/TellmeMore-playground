@@ -1,9 +1,13 @@
+/// <reference types="vite/client" />
+
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 
 type GameId = "feed" | "pack" | "survival" | "cringe";
 type ResultMood = "good" | "bad" | null;
+
+const assetUrl = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\//, "")}`;
 
 const feedRounds = [
   { want: "banana", prompt: "I want a banana!", audio: "/audio/monster/banana.mp3", options: [["banana", "🍌"], ["apple", "🍎"], ["cookie", "🍪"], ["carrot", "🥕"], ["milk", "🥛"]] },
@@ -151,7 +155,7 @@ let activeRecordedAudio: HTMLAudioElement | null = null;
 function playRecordedLine(source: string, fallbackText: string, enabled: boolean, mood: MonsterVoiceMood = "request") {
   if (!enabled || typeof window === "undefined") return;
   activeRecordedAudio?.pause();
-  const audio = new Audio(source); activeRecordedAudio = audio; audio.preload = "auto"; audio.volume = 0.96;
+  const audio = new Audio(assetUrl(source)); activeRecordedAudio = audio; audio.preload = "auto"; audio.volume = 0.96;
   void audio.play().catch((error: unknown) => {
     if (error instanceof DOMException && error.name === "NotAllowedError") return;
     speakMonster(fallbackText, enabled, mood);
@@ -487,7 +491,7 @@ function BrandLogo() {
     const context = canvas.getContext("2d", { willReadFrequently: true });
     if (!context) return;
     const image = new Image();
-    image.src = "/tmm-logo-source.png";
+    image.src = assetUrl("tmm-logo-source.png");
     image.onload = () => {
       context.clearRect(0, 0, canvas.width, canvas.height);
       context.drawImage(image, 66, 405, 895, 220, 0, 0, canvas.width, canvas.height);
