@@ -14,6 +14,7 @@ const feedRounds = [
   { want: "cookie", prompt: "I want a cookie!", audio: "/audio/monster/cookie.mp3", options: [["cookie", "🍪"], ["pear", "🍐"], ["cheese", "🧀"], ["grapes", "🍇"]] },
   { want: "milk", prompt: "I want some milk!", audio: "/audio/monster/milk.mp3", options: [["milk", "🥛"], ["lemon", "🍋"], ["bread", "🍞"], ["cake", "🍰"], ["egg", "🥚"]] },
   { want: "watermelon", prompt: "I want some watermelon!", audio: "/audio/monster/watermelon.mp3", options: [["watermelon", "🍉"], ["strawberry", "🍓"], ["ice cream", "🍦"], ["sandwich", "🥪"]] },
+  { want: "orange", prompt: "I want an orange!", audio: "/audio/monster/orange.mp3", options: [["pear", "🍐"], ["orange", "🍊"], ["apple", "🍎"], ["lemon", "🍋"], ["carrot", "🥕"]] },
 ] as const;
 
 const schoolItems = [
@@ -39,6 +40,7 @@ const packRounds = [
   { task: "I need a pencil and an eraser.", audio: "/audio/pack/mission-4.mp3", targets: ["pencil", "eraser"], options: ["ruler", "pencil-a", "notebook", "glue", "scissors", "eraser", "pen"] },
   { task: "I need a blue book and a pencil case.", audio: "/audio/pack/mission-5.mp3", targets: ["blue book", "pencil case"], options: ["book", "pen", "pencil-case", "red-notebook", "water-bottle", "blue-book", "ruler"] },
   { task: "I need a ruler, some glue, and scissors.", audio: "/audio/pack/mission-6.mp3", targets: ["ruler", "glue", "scissors"], options: ["pen", "scissors", "water-bottle", "ruler", "pencil-a", "glue", "eraser"] },
+  { task: "I need a water bottle and some glue.", audio: "/audio/pack/mission-7.mp3", targets: ["water bottle", "glue"], options: ["notebook", "glue", "pencil-case", "water-bottle", "book", "ruler", "pen"] },
 ] as const;
 
 function shufflePackOptions(data: typeof packRounds[number]) {
@@ -68,6 +70,7 @@ const bridgeBank = ["a film.", "watched", "Yesterday", "we"] as const;
 const escapeRelays = {
   6: [{ base: "PLAY", past: "PLAYED" }, { base: "GO", past: "WENT" }],
   7: [{ base: "SEE", past: "SAW" }, { base: "WATCH", past: "WATCHED" }],
+  8: [{ base: "EAT", past: "ATE" }, { base: "TAKE", past: "TOOK" }],
 } as const;
 
 type CringeMode = "delete" | "replace" | "unscramble" | "repair" | "natural" | "send";
@@ -90,6 +93,7 @@ const cringeRounds: CringeRound[] = [
   { stage: 3, stageLabel: "SOUND HUMAN", mode: "replace", author: "maya", avatar: "M", tokens: ["How", "is", "it", "called?"], solution: ["What", "is", "it", "called?"], targetIndex: 0, tray: ["Which", "What", "Why"], answer: "What", reaction: "Night Shift, I think.", hint: "Replace the word that sounds translated" },
   { stage: 3, stageLabel: "SOUND HUMAN", mode: "send", author: "alex_07", avatar: "A", tokens: ["I'm", "into", "horror", "movies."], solution: ["I'm", "into", "horror", "movies."], reaction: "Same. Have you seen The Thing?", hint: "This one may already be ready" },
   { stage: 3, stageLabel: "SOUND HUMAN", mode: "unscramble", author: "zoe", avatar: "Z", tokens: ["this", "weekend?", "you", "Do", "to", "hang", "out", "want"], solution: ["Do", "you", "want", "to", "hang", "out", "this", "weekend?"], reaction: "Yeah — Saturday works for me.", hint: "Rebuild the message, then send it" },
+  { stage: 3, stageLabel: "SOUND HUMAN", mode: "replace", author: "sam", avatar: "S", tokens: ["I", "look", "forward", "to", "see", "you."], solution: ["I", "look", "forward", "to", "seeing", "you."], targetIndex: 4, tray: ["saw", "seeing", "to see"], answer: "seeing", reaction: "Me too — see you on Saturday.", hint: "Replace the word that sounds unnatural" },
 ];
 
 const zoneData: { id: GameId; age: string; title: string; tagline: string; icon: string; action: string; tone: string }[] = [
@@ -266,7 +270,7 @@ function SurvivalGame({ onHome }: { onHome: () => void }) {
   const [drag, setDrag] = useState<{ id: string; x: number; y: number; sx: number; sy: number; moved: boolean; near: string } | null>(null);
   const portalRef = useRef<HTMLDivElement>(null); const doorRef = useRef<HTMLDivElement>(null); const bridgeRefs = useRef<(HTMLDivElement | null)[]>([]);
   const portalLesson = scene === 0 ? timePortalLessons[0] : scene === 1 ? timePortalLessons[1] : scene === 4 ? timePortalLessons[4] : scene === 5 ? timePortalLessons[5] : null;
-  const relay = scene === 6 ? escapeRelays[6] : scene === 7 ? escapeRelays[7] : null; const relayVerb = relay?.[relayStep];
+  const relay = scene === 6 ? escapeRelays[6] : scene === 7 ? escapeRelays[7] : scene === 8 ? escapeRelays[8] : null; const relayVerb = relay?.[relayStep];
   const advance = () => { setScene((value) => value + 1); setReaction(null); setTransformed(""); setRejected(""); setCreatedPast(""); setRelayStep(0); };
   const damage = () => { setLives((value) => { const next = Math.max(0, value - 1); if (next === 0) setTimeout(() => { setEscaped(false); setDone(true); }, 700); return next; }); };
   const findZone = (event: ReactPointerEvent<HTMLButtonElement>) => {
@@ -292,10 +296,10 @@ function SurvivalGame({ onHome }: { onHome: () => void }) {
   };
   const handleRelayDrop = (id: string, zone: string) => {
     if (!relay || !relayVerb || zone !== "portal" || id !== relayVerb.base) return; setReaction("good"); setTransformed(relayVerb.past);
-    setTimeout(() => { setTransformed(""); if (relayStep < relay.length - 1) { setRelayStep((value) => value + 1); setReaction(null); } else if (scene === 7) { setEscaped(true); setDone(true); } else advance(); }, 900);
+    setTimeout(() => { setTransformed(""); if (relayStep < relay.length - 1) { setRelayStep((value) => value + 1); setReaction(null); } else if (scene === 8) { setEscaped(true); setDone(true); } else advance(); }, 900);
   };
   const dropToken = (id: string, zone: string) => {
-    if (scene === 2) { handleBridgeDrop(id, zone); return; } if (scene === 3) { handleCreateDrop(id, zone); return; } if (scene === 6 || scene === 7) { handleRelayDrop(id, zone); return; }
+    if (scene === 2) { handleBridgeDrop(id, zone); return; } if (scene === 3) { handleCreateDrop(id, zone); return; } if (scene === 6 || scene === 7 || scene === 8) { handleRelayDrop(id, zone); return; }
     if (!portalLesson) return;
     if (!transformed && zone === "portal" && id === portalLesson.base) { completePortal(portalLesson.past, portalLesson.irregular); return; }
     if (transformed && zone === "door" && id === portalLesson.past) { setReaction("good"); setTimeout(advance, 900); }
@@ -304,8 +308,8 @@ function SurvivalGame({ onHome }: { onHome: () => void }) {
   const cancelDrag = () => setDrag(null);
   const token = (id: string, extra = "") => <button type="button" key={id} data-id={id} className={`time-word ${extra} ${drag?.id === id ? "is-dragging" : ""} ${rejected === id ? "is-rejected" : ""}`} aria-label={`Drag ${id}`} onPointerDown={(event) => beginDrag(event, id)} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={cancelDrag} style={drag?.id === id ? { transform: `translate3d(${drag.x}px, ${drag.y - 20}px, 0) scale(1.13)`, zIndex: 40 } : undefined}>{id}</button>;
   const reset = () => { setScene(0); setLives(3); setReaction(null); setDone(false); setEscaped(true); setTransformed(""); setBridgePlaced([null, null, null, null]); setRejected(""); setCreatedPast(""); setRelayStep(0); setDrag(null); };
-  if (done) return <FinalScreen icon={escaped ? "✦" : "⌛"} title={escaped ? "TIME REPAIRED" : "RIFT RESET"} score={escaped ? 8 : scene} total={8} detail={escaped ? "YOU ESCAPED!" : "TRY THE TIMELINE AGAIN"} tone="purple" onAgain={reset} onHome={onHome} />;
-  return <GameFrame title="ENGLISH SURVIVAL" round={scene} total={8} onBack={onHome} tone="purple">
+  if (done) return <FinalScreen icon={escaped ? "✦" : "⌛"} title={escaped ? "TIME REPAIRED" : "RIFT RESET"} score={escaped ? 9 : scene} total={9} detail={escaped ? "YOU ESCAPED!" : "TRY THE TIMELINE AGAIN"} tone="purple" onAgain={reset} onHome={onHome} />;
+  return <GameFrame title="ENGLISH SURVIVAL" round={scene} total={9} onBack={onHome} tone="purple">
     <section className={`time-stage danger-${3 - lives} ${reaction === "bad" ? "time-error" : ""} ${reaction === "good" ? "time-success" : ""}`}>
       <div className="time-world">
         <div className="time-rain" aria-hidden="true"/>
@@ -340,10 +344,10 @@ function SurvivalGame({ onHome }: { onHome: () => void }) {
           <p className="world-clue world-instruction"><b>{rejected === "WATCH" ? "TIME HINT" : "ACTION"}</b><span>{createdPast ? "Drag the transformed verb into the door slot" : rejected === "WATCH" ? "Use the portal before the door" : "Drag the matching verb through the portal"}</span></p>
         </div>}
         {relay && relayVerb && <div className="relay-mission">
-          <div className="world-caption"><small>{scene === 6 ? "ESCAPE RELAY I" : "FINAL ESCAPE"}</small><b>Repair every time fragment</b></div>
+          <div className="world-caption"><small>{scene === 6 ? "ESCAPE RELAY I" : scene === 7 ? "ESCAPE RELAY II" : "FINAL ESCAPE"}</small><b>Repair every time fragment</b></div>
           <div className="escape-cells">{relay.map((verb, index) => <span key={verb.base} className={index < relayStep || (index === relayStep && transformed) ? "powered" : ""}>{index + 1}</span>)}</div>
           <div className="relay-track">{token(relayVerb.base, "relay-word")}<div ref={portalRef} className={`time-portal relay-portal ${drag?.near === "portal" ? "is-near" : ""} ${reaction === "good" ? "is-transforming" : ""}`}><i/><em>SHIFT</em></div><div className="relay-output">{transformed || "?"}</div></div>
-          <div className={`escape-gate ${scene === 7 && relayStep === 1 ? "almost-open" : ""}`}><i/><i/><b>ESCAPE GATE</b></div>
+          <div className={`escape-gate ${scene === 8 && relayStep === 1 ? "almost-open" : ""}`}><i/><i/><b>ESCAPE GATE</b></div>
           <p className="world-clue world-instruction"><b>ACTION</b><span>Drag the next verb through the portal</span></p>
         </div>}
       </div>
@@ -413,7 +417,7 @@ function CringeGame({ onHome }: { onHome: () => void }) {
   const endMessageDrag = (event: ReactPointerEvent<HTMLDivElement>) => { if (!drag || drag.kind !== "message") return; const zone = findChatZone(event); setDrag(null); if (zone === "send") sendMessage(); };
   const reset = () => { setRound(0); setWords([...cringeRounds[0].tokens]); setSelected(null); setVibe(62); setScore(0); setNatural(0); setStreak(0); setBest(0); setMistakes(0); setReaction(null); setNpcBubble(""); setSent(false); setDone(false); setDrag(null); };
   const finalLine = vibe >= 90 ? "The conversation flows naturally." : vibe >= 70 ? "The group chat sounds clear and confident." : "The chat survived — a few messages took extra work.";
-  if (done) return <main className="game-shell game-red cringe-final-shell"><header className="game-topbar"><button type="button" className="back-button" onClick={onHome} aria-label="Back to zones">‹</button><strong>CRINGE OR CORRECT?</strong><span>12 / 12</span></header><section className="cringe-final"><p>FIX THE CRINGE · CHAT COMPLETE</p><h1>FINAL CHAT VIBE</h1><b>{vibe}%</b><h2>{finalLine}</h2><div className="cringe-stats"><span><small>MESSAGES SENT</small><strong>{score}</strong></span><span><small>NATURAL PHRASES</small><strong>{natural}</strong></span><span><small>BEST STREAK</small><strong>{best}</strong></span><span><small>RETRIES</small><strong>{mistakes}</strong></span></div><button type="button" className="primary-game-button" onClick={reset}>REPLAY ↻</button><button type="button" className="text-button" onClick={onHome}>PICK ANOTHER ZONE</button></section></main>;
+  if (done) return <main className="game-shell game-red cringe-final-shell"><header className="game-topbar"><button type="button" className="back-button" onClick={onHome} aria-label="Back to zones">‹</button><strong>CRINGE OR CORRECT?</strong><span>{cringeRounds.length} / {cringeRounds.length}</span></header><section className="cringe-final"><p>FIX THE CRINGE · CHAT COMPLETE</p><h1>FINAL CHAT VIBE</h1><b>{vibe}%</b><h2>{finalLine}</h2><div className="cringe-stats"><span><small>MESSAGES SENT</small><strong>{score}</strong></span><span><small>NATURAL PHRASES</small><strong>{natural}</strong></span><span><small>BEST STREAK</small><strong>{best}</strong></span><span><small>RETRIES</small><strong>{mistakes}</strong></span></div><button type="button" className="primary-game-button" onClick={reset}>REPLAY ↻</button><button type="button" className="text-button" onClick={onHome}>PICK ANOTHER ZONE</button></section></main>;
   const dragStyle = (kind: ChatDrag["kind"], index: number, word = "") => drag?.kind === kind && drag.index === index && (!word || drag.word === word) ? { transform: `translate3d(${drag.x}px, ${drag.y - 16}px, 0) scale(1.12)`, zIndex: 80 } : undefined;
   return <GameFrame title="CRINGE OR CORRECT?" round={round} total={cringeRounds.length} onBack={onHome} tone="red">
     <section className={`cringe-stage chat-game ${reaction === "bad" ? "chat-glitch" : ""}`}>
