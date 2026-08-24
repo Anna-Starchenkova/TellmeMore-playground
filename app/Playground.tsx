@@ -70,19 +70,26 @@ const escapeRelays = {
   7: [{ base: "SEE", past: "SAW" }, { base: "WATCH", past: "WATCHED" }],
 } as const;
 
-const cringePhrases = [
-  { text: "I am agree with you.", correct: false, fix: "I agree with you." },
-  { text: "I really like this song.", correct: true, fix: "Natural English!" },
-  { text: "I didn't went there.", correct: false, fix: "I didn't go there." },
-  { text: "It depends on the weather.", correct: true, fix: "Natural English!" },
-  { text: "I very like it.", correct: false, fix: "I like it very much." },
-  { text: "Let's meet at the weekend.", correct: true, fix: "Natural English!" },
-  { text: "How is it called?", correct: false, fix: "What is it called?" },
-  { text: "I'm looking forward to it.", correct: true, fix: "Natural English!" },
-  { text: "He explained me the rule.", correct: false, fix: "He explained the rule to me." },
-  { text: "That makes sense.", correct: true, fix: "Natural English!" },
-  { text: "We discussed about it.", correct: false, fix: "We discussed it." },
-  { text: "I haven't seen her lately.", correct: true, fix: "Natural English!" },
+type CringeMode = "delete" | "replace" | "unscramble" | "repair" | "natural" | "send";
+type CringeRound = {
+  stage: 1 | 2 | 3; stageLabel: "SPOT IT" | "FIX IT" | "SOUND HUMAN"; mode: CringeMode;
+  author: string; avatar: string; tokens: string[]; solution: string[]; reaction: string; hint: string;
+  targetIndex?: number; tray?: string[]; answer?: string; rule?: string;
+};
+
+const cringeRounds: CringeRound[] = [
+  { stage: 1, stageLabel: "SPOT IT", mode: "delete", author: "alex_07", avatar: "A", tokens: ["I", "am", "agree", "with", "you."], solution: ["I", "agree", "with", "you."], targetIndex: 1, reaction: "finally 💀", hint: "Drag the extra word to trash" },
+  { stage: 1, stageLabel: "SPOT IT", mode: "delete", author: "maya", avatar: "M", tokens: ["She", "can", "to", "swim."], solution: ["She", "can", "swim."], targetIndex: 2, reaction: "much better", hint: "Remove the word that does not belong" },
+  { stage: 1, stageLabel: "SPOT IT", mode: "repair", author: "dave", avatar: "D", tokens: ["I", "didn't", "went", "there."], solution: ["I", "didn't", "go", "there."], targetIndex: 2, answer: "go", rule: "DIDN'T → BASE VERB", reaction: "grammar saved", hint: "Drag the glitching word into repair" },
+  { stage: 1, stageLabel: "SPOT IT", mode: "replace", author: "zoe", avatar: "Z", tokens: ["He", "don't", "like", "it."], solution: ["He", "doesn't", "like", "it."], targetIndex: 1, tray: ["didn't", "doesn't", "isn't"], answer: "doesn't", reaction: "exactly", hint: "Tap the odd word, then replace it" },
+  { stage: 2, stageLabel: "FIX IT", mode: "replace", author: "luna", avatar: "L", tokens: ["I", "very", "like", "this", "song."], solution: ["I", "really", "like", "this", "song."], targetIndex: 1, tray: ["much", "so", "really"], answer: "really", reaction: "same 😭", hint: "Choose a better word and drop it in" },
+  { stage: 2, stageLabel: "FIX IT", mode: "unscramble", author: "sam", avatar: "S", tokens: ["yesterday.", "went", "I", "there"], solution: ["I", "went", "there", "yesterday."], reaction: "okay, that landed", hint: "Drag the message into a natural order" },
+  { stage: 2, stageLabel: "FIX IT", mode: "repair", author: "nick", avatar: "N", tokens: ["We", "did", "saw", "that", "movie."], solution: ["We", "did", "see", "that", "movie."], targetIndex: 2, answer: "see", rule: "DID → BASE VERB", reaction: "fixed the timeline", hint: "Send the broken verb through repair" },
+  { stage: 2, stageLabel: "FIX IT", mode: "delete", author: "emma", avatar: "E", tokens: ["We", "discussed", "about", "the", "plan."], solution: ["We", "discussed", "the", "plan."], targetIndex: 2, reaction: "no extra baggage", hint: "Delete the unnecessary word" },
+  { stage: 3, stageLabel: "SOUND HUMAN", mode: "natural", author: "leo", avatar: "L", tokens: ["I", "very", "love", "this", "game."], solution: ["I", "really", "love", "this", "game."], targetIndex: 1, tray: ["actually", "very", "really", "much"], answer: "really", reaction: "same tbh", hint: "Make the message sound natural" },
+  { stage: 3, stageLabel: "SOUND HUMAN", mode: "replace", author: "maya", avatar: "M", tokens: ["How", "is", "it", "called?"], solution: ["What", "is", "it", "called?"], targetIndex: 0, tray: ["Which", "What", "Why"], answer: "What", reaction: "yep, that's the phrase", hint: "Replace the word that sounds translated" },
+  { stage: 3, stageLabel: "SOUND HUMAN", mode: "send", author: "alex_07", avatar: "A", tokens: ["I'm", "into", "horror", "movies."], solution: ["I'm", "into", "horror", "movies."], reaction: "fair", hint: "This one may already be ready" },
+  { stage: 3, stageLabel: "SOUND HUMAN", mode: "unscramble", author: "zoe", avatar: "Z", tokens: ["this", "weekend?", "you", "Do", "to", "hang", "out", "want"], solution: ["Do", "you", "want", "to", "hang", "out", "this", "weekend?"], reaction: "okay, that sounded human", hint: "Rebuild the message, then send it" },
 ];
 
 const zoneData: { id: GameId; age: string; title: string; tagline: string; icon: string; action: string; tone: string }[] = [
@@ -313,18 +320,96 @@ function SurvivalGame({ onHome }: { onHome: () => void }) {
 }
 
 function CringeGame({ onHome }: { onHome: () => void }) {
-  const [round, setRound] = useState(0); const [score, setScore] = useState(0); const [streak, setStreak] = useState(0); const [best, setBest] = useState(0); const [reaction, setReaction] = useState<ResultMood>(null); const [done, setDone] = useState(false); const [dragX, setDragX] = useState(0); const startX = useRef<number | null>(null);
-  const data = cringePhrases[round];
-  const judge = (saysCorrect: boolean) => { if (reaction) return; const ok = saysCorrect === data.correct; setReaction(ok ? "good" : "bad"); if (ok) { setScore((s) => s + 1); setStreak((s) => { const next = s + 1; setBest((b) => Math.max(b, next)); return next; }); } else setStreak(0); setTimeout(() => { if (round === cringePhrases.length - 1) setDone(true); else { setRound((r) => r + 1); setReaction(null); setDragX(0); } }, 900); };
-  const pointerDown = (e: ReactPointerEvent<HTMLDivElement>) => { startX.current = e.clientX; e.currentTarget.setPointerCapture(e.pointerId); };
-  const pointerMove = (e: ReactPointerEvent<HTMLDivElement>) => { if (startX.current !== null) setDragX(Math.max(-150, Math.min(150, e.clientX - startX.current))); };
-  const pointerUp = () => { if (Math.abs(dragX) > 65) judge(dragX > 0); else setDragX(0); startX.current = null; };
-  const cringeLevel = Math.round(((cringePhrases.length - score) / cringePhrases.length) * 100);
-  if (done) return <FinalScreen icon={cringeLevel < 25 ? "🔥" : "💀"} title="CRINGE CHECKED" score={score} total={cringePhrases.length} detail={`CRINGE LEVEL: ${cringeLevel}% · BEST COMBO ×${best}`} tone="red" onAgain={() => { setRound(0); setScore(0); setStreak(0); setBest(0); setReaction(null); setDone(false); }} onHome={onHome} />;
-  return <GameFrame title="CRINGE OR CORRECT?" round={round} total={cringePhrases.length} onBack={onHome} tone="red">
-    <section className="cringe-stage"><div className="combo"><span>STREAK</span><b>×{streak}</b></div><p className="swipe-hint">SWIPE OR TAP</p>
-      <div className="judge-deck"><div className="ghost-card g1"/><div className="ghost-card g2"/><div role="group" aria-label="Phrase to judge" className={`phrase-card ${reaction === "good" ? "judge-good" : reaction === "bad" ? "judge-bad" : ""}`} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} style={{ transform: `translateX(${dragX}px) rotate(${dragX / 18}deg)` }}><span className="cringe-stamp">CRINGE 💀</span><span className="correct-stamp">CORRECT 🔥</span><small>DOES THIS SOUND RIGHT?</small><h1>“{data.text}”</h1>{reaction && <p>{reaction === "good" ? "NAILED IT!" : data.fix}</p>}</div></div>
-      <div className="judge-buttons"><button type="button" className="cringe-button" onClick={() => judge(false)}>💀<span>CRINGE</span></button><button type="button" className="correct-button" onClick={() => judge(true)}>🔥<span>CORRECT</span></button></div>
+  type ChatDrag = { kind: "word" | "tray" | "message"; index: number; word: string; x: number; y: number; sx: number; sy: number; moved: boolean; near: string };
+  const [round, setRound] = useState(0); const [words, setWords] = useState<string[]>([...cringeRounds[0].tokens]); const [selected, setSelected] = useState<number | null>(null); const [vibe, setVibe] = useState(62); const [score, setScore] = useState(0); const [natural, setNatural] = useState(0); const [streak, setStreak] = useState(0); const [best, setBest] = useState(0); const [mistakes, setMistakes] = useState(0); const [reaction, setReaction] = useState<ResultMood>(null); const [npcBubble, setNpcBubble] = useState(""); const [sent, setSent] = useState(false); const [done, setDone] = useState(false); const [drag, setDrag] = useState<ChatDrag | null>(null);
+  const trashRef = useRef<HTMLDivElement>(null); const repairRef = useRef<HTMLDivElement>(null); const sendRef = useRef<HTMLButtonElement>(null); const wordRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const data = cringeRounds[round]; const ready = words.join("|") === data.solution.join("|");
+  const stageProgress = cringeRounds.filter((item, index) => item.stage === data.stage && index <= round).length;
+  const stageTotal = cringeRounds.filter((item) => item.stage === data.stage).length;
+  const pointInside = (event: ReactPointerEvent<HTMLElement>, element: Element | null, padding = 0) => { const rect = element?.getBoundingClientRect(); return !!rect && event.clientX >= rect.left - padding && event.clientX <= rect.right + padding && event.clientY >= rect.top - padding && event.clientY <= rect.bottom + padding; };
+  const findChatZone = (event: ReactPointerEvent<HTMLElement>) => {
+    if (pointInside(event, trashRef.current, 16)) return "trash";
+    if (pointInside(event, repairRef.current, 16)) return "repair";
+    if (pointInside(event, sendRef.current, 14)) return "send";
+    const wordIndex = wordRefs.current.findIndex((element) => pointInside(event, element, 7));
+    return wordIndex >= 0 ? `word-${wordIndex}` : "";
+  };
+  const miss = () => {
+    if (reaction) return; setReaction("bad"); setNpcBubble(mistakes % 2 ? "what 💀" : "bro..."); setMistakes((value) => value + 1); setVibe((value) => Math.max(8, value - 4)); setStreak(0);
+    setTimeout(() => { setReaction(null); setNpcBubble(""); }, 760);
+  };
+  const fixedFlash = () => { setReaction("good"); setTimeout(() => setReaction(null), 430); };
+  const deleteWord = (index: number) => {
+    if (data.mode !== "delete" || index !== data.targetIndex) { miss(); return; }
+    setWords((value) => value.filter((_, wordIndex) => wordIndex !== index)); setSelected(null); fixedFlash();
+  };
+  const replaceWord = (word: string) => {
+    if ((data.mode !== "replace" && data.mode !== "natural") || selected !== data.targetIndex || word !== data.answer) { miss(); return; }
+    setWords((value) => value.map((entry, index) => index === selected ? word : entry)); setSelected(null); fixedFlash();
+  };
+  const repairWord = (index: number) => {
+    if (data.mode !== "repair" || index !== data.targetIndex || !data.answer) { miss(); return; }
+    setReaction("good"); setTimeout(() => { setWords((value) => value.map((entry, wordIndex) => wordIndex === index ? data.answer! : entry)); setSelected(null); setReaction(null); }, 620);
+  };
+  const moveWord = (from: number, to: number) => {
+    if (data.mode !== "unscramble" || from === to || from < 0 || to < 0) return;
+    setWords((value) => { const next = [...value]; const [moved] = next.splice(from, 1); next.splice(to, 0, moved); return next; }); setSelected(to);
+  };
+  const beginDrag = (event: ReactPointerEvent<HTMLElement>, kind: ChatDrag["kind"], word: string, index: number) => {
+    if (reaction || sent) return; event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); if (kind === "word") setSelected(index); setDrag({ kind, word, index, x: 0, y: 0, sx: event.clientX, sy: event.clientY, moved: false, near: "" });
+  };
+  const moveDrag = (event: ReactPointerEvent<HTMLElement>) => {
+    if (!drag) return; event.preventDefault(); const x = event.clientX - drag.sx; const y = event.clientY - drag.sy; setDrag((value) => value ? { ...value, x, y, moved: value.moved || Math.abs(x) + Math.abs(y) > 8, near: findChatZone(event) } : null);
+  };
+  const endWordDrag = (event: ReactPointerEvent<HTMLButtonElement>, index: number) => {
+    if (!drag || drag.kind !== "word" || drag.index !== index) return; const zone = findChatZone(event); const moved = drag.moved; setDrag(null);
+    if (!moved) { setSelected(index); return; }
+    if (data.mode === "delete" && zone === "trash") { deleteWord(index); return; }
+    if (data.mode === "repair" && zone === "repair") { repairWord(index); return; }
+    if (data.mode === "unscramble" && zone.startsWith("word-")) { moveWord(index, Number(zone.split("-")[1])); return; }
+    if (data.mode === "send") miss();
+  };
+  const endTrayDrag = (event: ReactPointerEvent<HTMLButtonElement>, word: string) => {
+    if (!drag || drag.kind !== "tray" || drag.word !== word) return; const zone = findChatZone(event); const moved = drag.moved; setDrag(null);
+    if (!moved || zone === `word-${selected}`) replaceWord(word); else miss();
+  };
+  const sendMessage = () => {
+    if (!ready || sent || reaction) { if (!ready) miss(); return; }
+    setSent(true); setReaction("good"); setNpcBubble(data.reaction); setScore((value) => value + 1); if (data.stage === 3) setNatural((value) => value + 1); setVibe((value) => Math.min(100, value + 4)); setStreak((value) => { const next = value + 1; setBest((current) => Math.max(current, next)); return next; });
+    setTimeout(() => { if (round === cringeRounds.length - 1) setDone(true); else { const next = round + 1; setRound(next); setWords([...cringeRounds[next].tokens]); setSelected(null); setReaction(null); setNpcBubble(""); setSent(false); setDrag(null); } }, 1050);
+  };
+  const endMessageDrag = (event: ReactPointerEvent<HTMLDivElement>) => { if (!drag || drag.kind !== "message") return; const zone = findChatZone(event); setDrag(null); if (zone === "send") sendMessage(); };
+  const reset = () => { setRound(0); setWords([...cringeRounds[0].tokens]); setSelected(null); setVibe(62); setScore(0); setNatural(0); setStreak(0); setBest(0); setMistakes(0); setReaction(null); setNpcBubble(""); setSent(false); setDone(false); setDrag(null); };
+  const cringeLevel = Math.min(96, 8 + mistakes * 7); const finalLine = cringeLevel <= 20 ? "You can be trusted with the group chat." : cringeLevel <= 45 ? "Not bad. The chat survived." : "The chat is recovering. Keep fixing.";
+  if (done) return <main className="game-shell game-red cringe-final-shell"><header className="game-topbar"><button type="button" className="back-button" onClick={onHome} aria-label="Back to zones">‹</button><strong>CRINGE OR CORRECT?</strong><span>12 / 12</span></header><section className="cringe-final"><p>FIX THE CRINGE · COMPLETE</p><h1>YOUR CRINGE LEVEL</h1><b>{cringeLevel}%</b><h2>{finalLine}</h2><div className="cringe-stats"><span><small>MESSAGES FIXED</small><strong>{score}</strong></span><span><small>NATURAL PHRASES</small><strong>{natural}</strong></span><span><small>BEST STREAK</small><strong>{best}</strong></span><span><small>CHAT VIBE</small><strong>{vibe}%</strong></span></div><button type="button" className="primary-game-button" onClick={reset}>REPLAY ↻</button><button type="button" className="text-button" onClick={onHome}>PICK ANOTHER ZONE</button></section></main>;
+  const dragStyle = (kind: ChatDrag["kind"], index: number, word = "") => drag?.kind === kind && drag.index === index && (!word || drag.word === word) ? { transform: `translate3d(${drag.x}px, ${drag.y - 16}px, 0) scale(1.12)`, zIndex: 80 } : undefined;
+  return <GameFrame title="CRINGE OR CORRECT?" round={round} total={cringeRounds.length} onBack={onHome} tone="red">
+    <section className={`cringe-stage chat-game ${reaction === "bad" ? "chat-glitch" : ""}`}>
+      <div className="chat-game-head"><div><small>FIX THE CRINGE</small><strong>ROUND {data.stage} · {data.stageLabel}</strong></div><div className="chat-vibe"><span>CHAT VIBE <b>{vibe}%</b></span><i><em style={{ width: `${vibe}%` }}/></i></div><div className="chat-streak">STREAK <b>×{streak}</b></div></div>
+      <div className="chat-layout">
+        <div className="chat-window">
+          <header><b># chill-zone</b><span>● {5 + data.stage} online</span><i>⌕　♩</i></header>
+          <div className="chat-feed">
+            <article className="chat-message ambient-message"><div className="chat-avatar bot">C</div><div><p><b>chat_core</b><time>now</time></p><div className="npc-text">read it. fix it. send it.</div></div></article>
+            <article className={`chat-message current-message ${reaction ?? ""}`}><div className={`chat-avatar avatar-${data.stage}`}>{data.avatar}</div><div><p><b>{data.author}</b><time>9:{40 + round} PM</time></p><div className={`editable-message mode-${data.mode} ${sent ? "is-sent" : ""}`}>
+              {words.map((word, index) => <button type="button" key={`${word}-${index}`} ref={(element) => { wordRefs.current[index] = element; }} className={`message-word ${selected === index ? "is-selected" : ""} ${data.mode === "repair" && index === data.targetIndex && !ready ? "is-glitching" : ""} ${data.mode === "unscramble" ? "is-fragment" : ""} ${drag?.kind === "word" && drag.index === index ? "is-dragging" : ""}`} aria-label={`${word}. Tap for actions or drag to edit.`} onPointerDown={(event) => beginDrag(event, "word", word, index)} onPointerMove={moveDrag} onPointerUp={(event) => endWordDrag(event, index)} onPointerCancel={() => setDrag(null)} onClick={(event) => { if (event.detail === 0) setSelected(index); }} style={dragStyle("word", index)}>{word}</button>)}
+            </div>{data.rule && ready && <small className="micro-rule">{data.rule}</small>}</div></article>
+            {npcBubble && <article className="chat-message npc-reaction"><div className="chat-avatar bot">C</div><div><p><b>chat_core</b><time>now</time></p><div className="npc-text">{npcBubble}</div></div></article>}
+          </div>
+          {ready && <div className="ready-composer"><div className={`ready-message ${drag?.kind === "message" ? "is-dragging" : ""}`} role="button" tabIndex={0} aria-label="Drag the finished message to Send" onPointerDown={(event) => beginDrag(event, "message", words.join(" "), -1)} onPointerMove={moveDrag} onPointerUp={endMessageDrag} onPointerCancel={() => setDrag(null)} style={dragStyle("message", -1)}><span>{words.join(" ")}</span><i>edited</i></div></div>}
+          <footer><button type="button">＋</button><span>{ready ? "Message ready — drag it to SEND" : "Fix the message…"}</span><i>☺　♩</i></footer>
+        </div>
+        <aside className="chat-tools">
+          <div className="chat-task"><small>{data.mode === "natural" ? "SOUND HUMAN" : data.mode === "unscramble" ? "UNSCRAMBLE" : data.mode === "repair" ? "GLITCH WORD" : data.mode === "delete" ? "DELETE THE CRINGE" : data.mode === "send" ? "READ THE ROOM" : "REPLACE IT"}</small><strong>{data.hint}</strong><span>Tap a word for accessible actions, or drag it.</span></div>
+          {data.mode === "delete" && <div ref={trashRef} className={`chat-drop trash-drop ${drag?.near === "trash" ? "is-near" : ""}`}><b>⌫</b><span>TRASH</span></div>}
+          {data.mode === "repair" && <div ref={repairRef} className={`chat-drop repair-drop ${drag?.near === "repair" ? "is-near" : ""} ${reaction === "good" ? "is-working" : ""}`}><b>⌁</b><span>REPAIR SLOT</span></div>}
+          {(data.mode === "replace" || data.mode === "natural") && <div className={`word-tray ${selected === null ? "is-locked" : ""}`}><small>{selected === null ? "TAP THE WORD TO OPEN THE TRAY" : "DRAG A WORD CHIP INTO THE MESSAGE"}</small><div>{data.tray?.map((word, index) => <button type="button" key={word} className={`tray-word ${drag?.kind === "tray" && drag.word === word ? "is-dragging" : ""}`} onPointerDown={(event) => beginDrag(event, "tray", word, index)} onPointerMove={moveDrag} onPointerUp={(event) => endTrayDrag(event, word)} onPointerCancel={() => setDrag(null)} onClick={(event) => { if (event.detail === 0) replaceWord(word); }} style={dragStyle("tray", index, word)}>{word}</button>)}</div></div>}
+          {selected !== null && <div className="tap-actions"><small>TAP ACTIONS</small>{data.mode === "delete" && <button type="button" onClick={() => deleteWord(selected)}>DELETE SELECTED</button>}{data.mode === "repair" && <button type="button" onClick={() => repairWord(selected)}>REPAIR SELECTED</button>}{data.mode === "unscramble" && <><button type="button" disabled={selected === 0} onClick={() => moveWord(selected, selected - 1)}>← MOVE</button><button type="button" disabled={selected === words.length - 1} onClick={() => moveWord(selected, selected + 1)}>MOVE →</button></>}</div>}
+          <div className="chat-cycle"><span className={ready ? "done" : "active"}>READ</span><i>→</i><span className={ready ? "done" : "active"}>FIX</span><i>→</i><span className={ready ? "active" : ""}>SEND</span></div>
+          <button ref={sendRef} type="button" className={`chat-send ${ready ? "is-ready" : ""} ${drag?.near === "send" ? "is-near" : ""}`} disabled={!ready || sent} onPointerDown={(event) => event.stopPropagation()} onClick={sendMessage}><span>SEND</span><b>↗</b></button>
+          <p className="chat-round-count">{data.stageLabel} · {stageProgress} / {stageTotal}</p>
+        </aside>
+      </div>
     </section>
   </GameFrame>;
 }
