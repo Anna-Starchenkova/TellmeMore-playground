@@ -17,6 +17,19 @@ const feedRounds = [
   { want: "orange", prompt: "I want an orange!", audio: "/audio/monster/orange.mp3", options: [["pear", "🍐"], ["orange", "🍊"], ["apple", "🍎"], ["lemon", "🍋"], ["carrot", "🥕"]] },
 ] as const;
 
+function shuffleFeedOptions(data: typeof feedRounds[number]) {
+  const order = [...data.options] as Array<readonly [string, string]>;
+  for (let index = order.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [order[index], order[swapIndex]] = [order[swapIndex], order[index]];
+  }
+  if (order[0]?.[0] === data.want) {
+    const distractorIndex = order.findIndex(([name]) => name !== data.want);
+    if (distractorIndex > 0) [order[0], order[distractorIndex]] = [order[distractorIndex], order[0]];
+  }
+  return order;
+}
+
 const schoolItems = [
   { id: "book", name: "book", label: "BOOK", emoji: "📙", hue: "31 96% 58%" },
   { id: "blue-book", name: "blue book", label: "BLUE BOOK", emoji: "📘", hue: "213 100% 55%" },
@@ -170,9 +183,11 @@ function FinalScreen({ icon, title, score, total, detail, tone, onAgain, onHome 
 
 function FeedGame({ sound, onHome }: { sound: boolean; onHome: () => void }) {
   const [round, setRound] = useState(0); const [score, setScore] = useState(0); const [reaction, setReaction] = useState<ResultMood>(null); const [picked, setPicked] = useState(""); const [done, setDone] = useState(false); const [hintDismissed, setHintDismissed] = useState(false);
+  const [foodOrder, setFoodOrder] = useState<Array<readonly [string, string]>>([...feedRounds[0].options]);
   const [drag, setDrag] = useState<{ name: string; x: number; y: number; sx: number; sy: number; near: boolean } | null>(null); const [look, setLook] = useState({ x: 0, y: 0 });
   const mouthRef = useRef<HTMLDivElement>(null);
   const data = feedRounds[round];
+  useEffect(() => { if (!done) setFoodOrder(shuffleFeedOptions(data)); }, [round, done, data]);
   useEffect(() => { if (!done) { const timer = setTimeout(() => playRecordedLine(data.audio, data.prompt, sound), 350); return () => clearTimeout(timer); } }, [round, done, data.audio, data.prompt, sound]);
   const finishDrop = (name: string) => {
     if (reaction) return; const correct = name === data.want; setPicked(name); setReaction(correct ? "good" : "bad");
@@ -198,7 +213,7 @@ function FeedGame({ sound, onHome }: { sound: boolean; onHome: () => void }) {
     setDrag(null); setLook({ x: 0, y: 0 }); if (overMouth) finishDrop(name);
   };
   const pointerCancel = () => { setDrag(null); setLook({ x: 0, y: 0 }); };
-  if (done) return <FinalScreen icon="👾" title="MONSTER FED!" score={score} total={feedRounds.length} detail="SUPER TASTY!" tone="lime" onAgain={() => { setRound(0); setScore(0); setDone(false); setHintDismissed(false); }} onHome={onHome} />;
+  if (done) return <FinalScreen icon="👾" title="MONSTER FED!" score={score} total={feedRounds.length} detail="SUPER TASTY!" tone="lime" onAgain={() => { setFoodOrder(shuffleFeedOptions(feedRounds[0])); setRound(0); setScore(0); setDone(false); setHintDismissed(false); }} onHome={onHome} />;
   const pickedEmoji = data.options.find(([name]) => name === picked)?.[1];
   const labStyle = { "--look-x": `${look.x}px`, "--look-y": `${look.y}px` } as CSSProperties;
   return <GameFrame title="FEED THE MONSTER" round={round} total={feedRounds.length} onBack={onHome}>
@@ -210,7 +225,7 @@ function FeedGame({ sound, onHome }: { sound: boolean; onHome: () => void }) {
         {reaction === "good" && <div className="yum-burst" aria-hidden="true">♥ ✦ ♥</div>}
         {reaction === "bad" && pickedEmoji && <div className="spit-food" aria-hidden="true">{pickedEmoji}</div>}
         <div className="food-field">
-          {data.options.map(([name, emoji], index) => <button type="button" key={name} data-name={name} aria-label={`Drag ${name} to the monster`} onPointerDown={(event) => pointerDown(event, name)} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerCancel} className={`food-option food-${index} ${drag?.name === name ? "food-dragging" : ""} ${picked === name && reaction === "good" ? "food-fed" : ""} ${picked === name && reaction === "bad" ? "food-rejected" : ""}`} style={drag?.name === name ? { transform: `translate3d(${drag.x}px, ${drag.y}px, 0) scale(1.16)`, zIndex: 30 } : undefined}><span>{emoji}</span><b>{name}</b></button>)}
+          {foodOrder.map(([name, emoji], index) => <button type="button" key={name} data-name={name} aria-label={`Drag ${name} to the monster`} onPointerDown={(event) => pointerDown(event, name)} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerCancel} className={`food-option food-${index} ${drag?.name === name ? "food-dragging" : ""} ${picked === name && reaction === "good" ? "food-fed" : ""} ${picked === name && reaction === "bad" ? "food-rejected" : ""}`} style={drag?.name === name ? { transform: `translate3d(${drag.x}px, ${drag.y}px, 0) scale(1.16)`, zIndex: 30 } : undefined}><span>{emoji}</span><b>{name}</b></button>)}
         </div>
         {round === 0 && !hintDismissed && <div className="drag-hint" aria-hidden="true"><span>☝️</span><i/></div>}
       </div>
