@@ -6,14 +6,14 @@ type GameId = "feed" | "pack" | "survival" | "cringe";
 type ResultMood = "good" | "bad" | null;
 
 const feedRounds = [
-  { want: "banana", prompt: "I want a banana!", options: [["banana", "🍌"], ["apple", "🍎"], ["cookie", "🍪"], ["carrot", "🥕"], ["milk", "🥛"]] },
-  { want: "pizza", prompt: "I want some pizza!", options: [["pizza", "🍕"], ["cheese", "🧀"], ["bread", "🍞"], ["grapes", "🍇"]] },
-  { want: "ice cream", prompt: "I want some ice cream!", options: [["ice cream", "🍦"], ["cake", "🍰"], ["lemon", "🍋"], ["watermelon", "🍉"], ["pear", "🍐"]] },
-  { want: "carrot", prompt: "I want a carrot!", options: [["carrot", "🥕"], ["strawberry", "🍓"], ["egg", "🥚"], ["sandwich", "🥪"]] },
-  { want: "apple", prompt: "I want an apple!", options: [["apple", "🍎"], ["banana", "🍌"], ["milk", "🥛"], ["pizza", "🍕"], ["cookie", "🍪"]] },
-  { want: "cookie", prompt: "I want a cookie!", options: [["cookie", "🍪"], ["pear", "🍐"], ["cheese", "🧀"], ["grapes", "🍇"]] },
-  { want: "milk", prompt: "I want some milk!", options: [["milk", "🥛"], ["lemon", "🍋"], ["bread", "🍞"], ["cake", "🍰"], ["egg", "🥚"]] },
-  { want: "watermelon", prompt: "I want some watermelon!", options: [["watermelon", "🍉"], ["strawberry", "🍓"], ["ice cream", "🍦"], ["sandwich", "🥪"]] },
+  { want: "banana", prompt: "I want a banana!", audio: "/audio/monster/banana.mp3", options: [["banana", "🍌"], ["apple", "🍎"], ["cookie", "🍪"], ["carrot", "🥕"], ["milk", "🥛"]] },
+  { want: "pizza", prompt: "I want some pizza!", audio: "/audio/monster/pizza.mp3", options: [["pizza", "🍕"], ["cheese", "🧀"], ["bread", "🍞"], ["grapes", "🍇"]] },
+  { want: "ice cream", prompt: "I want some ice cream!", audio: "/audio/monster/ice-cream.mp3", options: [["ice cream", "🍦"], ["cake", "🍰"], ["lemon", "🍋"], ["watermelon", "🍉"], ["pear", "🍐"]] },
+  { want: "carrot", prompt: "I want a carrot!", audio: "/audio/monster/carrot.mp3", options: [["carrot", "🥕"], ["strawberry", "🍓"], ["egg", "🥚"], ["sandwich", "🥪"]] },
+  { want: "apple", prompt: "I want an apple!", audio: "/audio/monster/apple.mp3", options: [["apple", "🍎"], ["banana", "🍌"], ["milk", "🥛"], ["pizza", "🍕"], ["cookie", "🍪"]] },
+  { want: "cookie", prompt: "I want a cookie!", audio: "/audio/monster/cookie.mp3", options: [["cookie", "🍪"], ["pear", "🍐"], ["cheese", "🧀"], ["grapes", "🍇"]] },
+  { want: "milk", prompt: "I want some milk!", audio: "/audio/monster/milk.mp3", options: [["milk", "🥛"], ["lemon", "🍋"], ["bread", "🍞"], ["cake", "🍰"], ["egg", "🥚"]] },
+  { want: "watermelon", prompt: "I want some watermelon!", audio: "/audio/monster/watermelon.mp3", options: [["watermelon", "🍉"], ["strawberry", "🍓"], ["ice cream", "🍦"], ["sandwich", "🥪"]] },
 ] as const;
 
 const schoolItems = [
@@ -139,6 +139,18 @@ function speakMonster(text: string, enabled: boolean, mood: MonsterVoiceMood = "
   synthesizer.speak(utterance);
 }
 
+let activeMonsterAudio: HTMLAudioElement | null = null;
+
+function playMonsterLine(source: string, fallbackText: string, enabled: boolean, mood: MonsterVoiceMood = "request") {
+  if (!enabled || typeof window === "undefined") return;
+  activeMonsterAudio?.pause();
+  const audio = new Audio(source); activeMonsterAudio = audio; audio.preload = "auto"; audio.volume = 0.96;
+  void audio.play().catch((error: unknown) => {
+    if (error instanceof DOMException && error.name === "NotAllowedError") return;
+    speakMonster(fallbackText, enabled, mood);
+  });
+}
+
 function GameFrame({ title, round, total, onBack, children, tone = "lime" }: { title: string; round: number; total: number; onBack: () => void; children: React.ReactNode; tone?: string }) {
   return <main className={`game-shell game-${tone}`}>
     <header className="game-topbar">
@@ -167,14 +179,14 @@ function FeedGame({ sound, onHome }: { sound: boolean; onHome: () => void }) {
   const [drag, setDrag] = useState<{ name: string; x: number; y: number; sx: number; sy: number; near: boolean } | null>(null); const [look, setLook] = useState({ x: 0, y: 0 });
   const mouthRef = useRef<HTMLDivElement>(null);
   const data = feedRounds[round];
-  useEffect(() => { if (!done) { const timer = setTimeout(() => speakMonster(data.prompt, sound), 350); return () => clearTimeout(timer); } }, [round, done, data.prompt, sound]);
+  useEffect(() => { if (!done) { const timer = setTimeout(() => playMonsterLine(data.audio, data.prompt, sound), 350); return () => clearTimeout(timer); } }, [round, done, data.audio, data.prompt, sound]);
   const finishDrop = (name: string) => {
     if (reaction) return; const correct = name === data.want; setPicked(name); setReaction(correct ? "good" : "bad");
     if (correct) {
-      setScore((value) => value + 1); speakMonster("Yum! Thank you!", sound, "happy");
+      setScore((value) => value + 1); playMonsterLine("/audio/monster/yum.mp3", "Yum! Thank you!", sound, "happy");
       setTimeout(() => { if (round === feedRounds.length - 1) setDone(true); else setRound((value) => value + 1); setReaction(null); setPicked(""); }, 1050);
     } else {
-      speakMonster("Bleh!", sound, "funny"); setTimeout(() => { setReaction(null); setPicked(""); }, 950);
+      playMonsterLine("/audio/monster/bleh.mp3", "Bleh!", sound, "funny"); setTimeout(() => { setReaction(null); setPicked(""); }, 950);
     }
   };
   const pointerDown = (event: ReactPointerEvent<HTMLButtonElement>, name: string) => {
@@ -198,7 +210,7 @@ function FeedGame({ sound, onHome }: { sound: boolean; onHome: () => void }) {
   return <GameFrame title="FEED THE MONSTER" round={round} total={feedRounds.length} onBack={onHome}>
     <section className="feed-stage feed-3d-stage">
       <div className={`monster-lab ${drag ? "is-tracking" : ""} ${drag?.near ? "is-near" : ""} ${reaction === "good" ? "is-chewing" : reaction === "bad" ? "is-disgusted" : ""}`} style={labStyle}>
-        <button type="button" className="speech-bubble" onClick={() => speakMonster(data.prompt, sound)} aria-label="Repeat request"><span>🔊</span>{data.prompt}</button>
+        <button type="button" className="speech-bubble" onClick={() => playMonsterLine(data.audio, data.prompt, sound)} aria-label="Repeat request"><span>🔊</span>{data.prompt}</button>
         <i className="tracking-glint glint-left"/><i className="tracking-glint glint-right"/>
         <div ref={mouthRef} className="mouth-drop" aria-label="Monster mouth drop zone"/>
         {reaction === "good" && <div className="yum-burst" aria-hidden="true">♥ ✦ ♥</div>}
